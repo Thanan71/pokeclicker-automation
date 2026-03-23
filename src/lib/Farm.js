@@ -20,6 +20,10 @@
  *       This menu will be hidden until the functionality is unlocked in-game.
  */
 
-// Re-export the main class for backward compatibility
+// Import all Farm modules
+// Note: In browser environment, these are loaded via script tags in ComponentLoader.js
+// This file serves as the entry point and maintains backward compatibility
+
 // The AutomationFarm class is defined in Farm/FarmCore.js
-// This allows existing code to continue using AutomationFarm without changes
+// This file ensures backward compatibility by re-exporting it
+// All functionality has been split into focused modules following SOLID principles

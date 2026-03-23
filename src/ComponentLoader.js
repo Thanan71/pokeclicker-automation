@@ -45,6 +45,11 @@ class AutomationComponentLoader
         this.__addScript("src/lib/Instances/Safari.js");
 
         this.__addScript("src/lib/Click.js");
+        this.__addScript("src/lib/Farm/FarmMenuBuilder.js");
+        this.__addScript("src/lib/Farm/FarmBerryOptimizer.js");
+        this.__addScript("src/lib/Farm/FarmPlotManager.js");
+        this.__addScript("src/lib/Farm/FarmMutationStrategies.js");
+        this.__addScript("src/lib/Farm/FarmCore.js");
         this.__addScript("src/lib/Farm.js");
         this.__addScript("src/lib/Focus.js");
         this.__addScript("src/lib/Hatchery.js");
