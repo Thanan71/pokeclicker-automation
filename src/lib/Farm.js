@@ -2506,7 +2506,7 @@ class AutomationFarm {
      * @returns True if the berry is unlocked, false otherwise
      */
     static __internal__isBerryUnlocked(berryType) {
-        return typeof App.game.farming.unlockedBerries[berryType] === 'function' && App.game.farming.unlockedBerries[berryType]();
+        return App.game.farming.unlockedBerries[berryType] === true;
     }
 
     /**
