@@ -14,7 +14,33 @@ class AutomationFarm {
         OakItemLoadoutUpdate: "Farming-OakItemLoadoutUpdate",
         SelectedBerryToPlant: "Farming-SelectedBerryToPlant",
         UseRichMulch: "Farming-UseRichMulch",
-        UseShovel: "Farming-UseShovel"
+        UseShovel: "Farming-UseShovel",
+        // New advanced settings
+        AutoOptimizeBerries: "Farming-AutoOptimizeBerries",
+        AutoMutations: "Farming-AutoMutations",
+        MaximizeFarmPoints: "Farming-MaximizeFarmPoints",
+        SmartPlotManagement: "Farming-SmartPlotManagement",
+        OptimalTiming: "Farming-OptimalTiming"
+    };
+
+    // Berry scoring cache for performance
+    static __internal__berryScoreCache = new Map();
+    static __internal__lastScoreCacheUpdate = 0;
+    static SCORE_CACHE_DURATION = 30000; // 30 seconds
+
+    // Mutation tracking
+    static __internal__activeMutations = new Map();
+    static __internal__mutationQueue = [];
+
+    // Plot state tracking
+    static __internal__plotStates = [];
+    static __internal__lastPlotScan = 0;
+
+    // Farm Points optimization data
+    static __internal__fpOptimizationData = {
+        bestBerry: null,
+        bestFpPerMinute: 0,
+        lastUpdate: 0
     };
 
     // The berry type forced to plant by other features
@@ -33,6 +59,12 @@ class AutomationFarm {
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.UseShovel, false);
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.SelectedBerryToPlant, BerryType.Cheri);
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.ColburNonsenseEnabled, false);
+            // New advanced settings defaults
+            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.AutoOptimizeBerries, true);
+            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.AutoMutations, true);
+            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.MaximizeFarmPoints, true);
+            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.SmartPlotManagement, true);
+            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.OptimalTiming, true);
 
             this.__internal__buildMenu();
         }
@@ -226,6 +258,52 @@ class AutomationFarm {
             () => AutomationFarm.toggleColburNonsense(Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled) === "true")
         );
 
+        // === ADVANCED FARMING FEATURES ===
+        const advancedTitleDiv = Automation.Menu.createTitleElement("🌾 Advanced Farming Intelligence");
+        advancedTitleDiv.style.marginTop = "15px";
+        advancedTitleDiv.style.marginBottom = "10px";
+        farmingSettingPanel.appendChild(advancedTitleDiv);
+
+        // Auto-optimize berries button
+        const autoOptimizeTooltip = "Automatically selects the best berry to plant based on Farm Points per minute.\n"
+            + "Calculates optimal berry using: harvest amount, growth time, and FP value.";
+        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Auto-optimize berry selection",
+            this.Settings.AutoOptimizeBerries,
+            autoOptimizeTooltip,
+            farmingSettingPanel);
+
+        // Auto-mutations button
+        const autoMutationsTooltip = "Automatically plants berries in optimal patterns to trigger mutations.\n"
+            + "Prioritizes rare berries and maximizes mutation success rate.";
+        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Auto-mutations enabled",
+            this.Settings.AutoMutations,
+            autoMutationsTooltip,
+            farmingSettingPanel);
+
+        // Maximize Farm Points button
+        const maximizeFPTooltip = "Focuses on maximizing Farm Points generation.\n"
+            + "Calculates exact FP/min for each berry and chooses the most profitable.";
+        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Maximize Farm Points",
+            this.Settings.MaximizeFarmPoints,
+            maximizeFPTooltip,
+            farmingSettingPanel);
+
+        // Smart plot management button
+        const smartPlotTooltip = "Intelligently manages all plots in real-time.\n"
+            + "Monitors plot states, handles locked plots, and optimizes layout.";
+        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Smart plot management",
+            this.Settings.SmartPlotManagement,
+            smartPlotTooltip,
+            farmingSettingPanel);
+
+        // Optimal timing button
+        const optimalTimingTooltip = "Harvests berries at the perfect moment for maximum yield.\n"
+            + "Synchronizes rich mulch application and handles mutation timing.";
+        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Optimal harvest timing",
+            this.Settings.OptimalTiming,
+            optimalTimingTooltip,
+            farmingSettingPanel);
+
         // Disable the harvest late feature if the Focus on unlocks is enabled
         const disableReason = "This settings is not considered when the\n"
             + `'${unlockLabel}' setting is enabled`;
@@ -375,15 +453,14 @@ class AutomationFarm {
      * Automatically harvests crops and plants the selected berry (from the in-game menu)
      */
     static __internal__farmLoop() {
-        this.__internal__catchWanderingPokemons();
+        // Run enhanced farming features first
+        this.__internal__enhancedFarmLoop();
 
         this.__internal__harvestAsEfficientAsPossible();
 
         if (Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled)) {
             AutomationFarm.__internal__maintainColburNonsense();
         }
-
-        // Try to unlock berries, if enabled
 
         // Try to unlock berries, if enabled
         if ((Automation.Utils.LocalStorage.getValue(this.Settings.FocusOnUnlocks) === "true")
@@ -409,7 +486,7 @@ class AutomationFarm {
         this.__internal__updateFloatingPanel();
 
         // Otherwise, fallback to planting berries
-        const berryToPlant = this.ForcePlantBerriesAsked ?? parseInt(Automation.Utils.LocalStorage.getValue(this.Settings.SelectedBerryToPlant));
+        const berryToPlant = this.ForcePlantBerriesAsked ?? this.__internal__getBestBerryToPlant();
 
         // Remove any unwanted berry, if enabled
         if (Automation.Utils.LocalStorage.getValue(this.Settings.UseShovel) === "true") {
@@ -2415,5 +2492,508 @@ class AutomationFarm {
         } else {
             AutomationFarm.__internal__desiredLayout = null;
         }
+    }
+
+    /*********************************************************************\
+    |***        ADVANCED FARMING INTELLIGENCE METHODS                 ***|
+    \*********************************************************************/
+
+    /**
+     * @brief Calculates the Farm Points per minute for a given berry type
+     *
+     * @param berryType: The type of berry to calculate FP/min for
+     *
+     * @returns The Farm Points per minute value
+     */
+    static __internal__calculateFpPerMinute(berryType) {
+        if (!App.game.farming.unlockedBerries[berryType]()) {
+            return 0;
+        }
+
+        const berryData = App.game.farming.berryData[berryType];
+        if (!berryData) {
+            return 0;
+        }
+
+        // Get growth time in minutes
+        const growthTimeMinutes = berryData.growthTime[PlotStage.Bloom] / 60000;
+
+        // Get harvest amount
+        const harvestAmount = berryData.harvestAmount;
+
+        // Get Farm Points value
+        const fpValue = berryData.farmValue;
+
+        // Calculate FP per minute: (harvestAmount * fpValue) / growthTimeMinutes
+        const fpPerMinute = (harvestAmount * fpValue) / growthTimeMinutes;
+
+        return fpPerMinute;
+    }
+
+    /**
+     * @brief Calculates a comprehensive score for a berry based on multiple factors
+     *
+     * @param berryType: The type of berry to score
+     *
+     * @returns The berry score (higher is better)
+     */
+    static __internal__calculateBerryScore(berryType) {
+        // Check cache first
+        const now = Date.now();
+        if (this.__internal__berryScoreCache.has(berryType) &&
+            (now - this.__internal__lastScoreCacheUpdate) < this.SCORE_CACHE_DURATION) {
+            return this.__internal__berryScoreCache.get(berryType);
+        }
+
+        if (!App.game.farming.unlockedBerries[berryType]()) {
+            return 0;
+        }
+
+        const berryData = App.game.farming.berryData[berryType];
+        if (!berryData) {
+            return 0;
+        }
+
+        // Factor 1: Farm Points per minute (40% weight)
+        const fpPerMinute = this.__internal__calculateFpPerMinute(berryType);
+        const fpScore = fpPerMinute * 0.4;
+
+        // Factor 2: Harvest amount efficiency (20% weight)
+        const harvestScore = berryData.harvestAmount * 0.2;
+
+        // Factor 3: Growth speed bonus (20% weight) - faster is better
+        const growthTimeMinutes = berryData.growthTime[PlotStage.Bloom] / 60000;
+        const speedScore = (1 / Math.max(growthTimeMinutes, 0.1)) * 20;
+
+        // Factor 4: Mutation potential (10% weight)
+        const mutationScore = this.__internal__calculateMutationPotential(berryType) * 0.1;
+
+        // Factor 5: Rarity bonus (10% weight)
+        const rarityScore = this.__internal__calculateRarityBonus(berryType) * 0.1;
+
+        // Total score
+        const totalScore = fpScore + harvestScore + speedScore + mutationScore + rarityScore;
+
+        // Cache the result
+        this.__internal__berryScoreCache.set(berryType, totalScore);
+        this.__internal__lastScoreCacheUpdate = now;
+
+        return totalScore;
+    }
+
+    /**
+     * @brief Calculates mutation potential for a berry type
+     *
+     * @param berryType: The type of berry
+     *
+     * @returns Mutation potential score
+     */
+    static __internal__calculateMutationPotential(berryType) {
+        let potential = 0;
+
+        // Check how many mutations this berry can trigger
+        for (const mutation of App.game.farming.mutations) {
+            if (mutation.mutatedBerry === berryType) {
+                potential += 10; // This berry is a mutation result
+            }
+            // Check if this berry is used in mutation requirements
+            if (mutation.requirements) {
+                for (const req of mutation.requirements) {
+                    if (req.berry === berryType) {
+                        potential += 5; // This berry is used in mutations
+                    }
+                }
+            }
+        }
+
+        return potential;
+    }
+
+    /**
+     * @brief Calculates rarity bonus for a berry type
+     *
+     * @param berryType: The type of berry
+     *
+     * @returns Rarity bonus score
+     */
+    static __internal__calculateRarityBonus(berryType) {
+        // Higher generation berries are rarer
+        const berryGen = Math.floor(berryType / 8) + 1;
+        return berryGen * 2;
+    }
+
+    /**
+     * @brief Gets the best berry to plant based on current conditions
+     *
+     * @returns The best berry type to plant
+     */
+    static __internal__getBestBerryToPlant() {
+        // If auto-optimize is disabled, use selected berry
+        if (Automation.Utils.LocalStorage.getValue(this.Settings.AutoOptimizeBerries) !== "true") {
+            return parseInt(Automation.Utils.LocalStorage.getValue(this.Settings.SelectedBerryToPlant));
+        }
+
+        let bestBerry = BerryType.Cheri;
+        let bestScore = 0;
+
+        // Check all unlocked berries
+        for (let berryType = 0; berryType < Object.keys(BerryType).length / 2; berryType++) {
+            if (!App.game.farming.unlockedBerries[berryType]()) {
+                continue;
+            }
+
+            // Skip if no berries in inventory
+            if (App.game.farming.berryList[berryType]() === 0) {
+                continue;
+            }
+
+            const score = this.__internal__calculateBerryScore(berryType);
+            if (score > bestScore) {
+                bestScore = score;
+                bestBerry = berryType;
+            }
+        }
+
+        return bestBerry;
+    }
+
+    /**
+     * @brief Scans and updates plot states for smart management
+     */
+    static __internal__scanPlotStates() {
+        const now = Date.now();
+        if ((now - this.__internal__lastPlotScan) < 5000) {
+            return; // Only scan every 5 seconds
+        }
+
+        this.__internal__plotStates = [];
+        this.__internal__lastPlotScan = now;
+
+        for (const [index, plot] of App.game.farming.plotList.entries()) {
+            const state = {
+                index: index,
+                isUnlocked: plot.isUnlocked,
+                isEmpty: plot.isEmpty(),
+                berry: plot.berry,
+                stage: plot.stage(),
+                age: plot.age,
+                isSafeLocked: plot.isSafeLocked,
+                hasWanderer: plot.wanderer !== null,
+                mulch: plot.mulch,
+                timeUntilRipe: plot.isEmpty() ? 0 : this.__internal__getTimeUntilStage(plot, PlotStage.Berry),
+                timeUntilWither: plot.isEmpty() ? 0 : this.__internal__getTimeUntilStage(plot, PlotStage.Berry) +
+                    (plot.berryData?.growthTime[PlotStage.Berry] || 0) - plot.age
+            };
+            this.__internal__plotStates.push(state);
+        }
+    }
+
+    /**
+     * @brief Performs smart plot management
+     */
+    static __internal__smartPlotManagement() {
+        if (Automation.Utils.LocalStorage.getValue(this.Settings.SmartPlotManagement) !== "true") {
+            return;
+        }
+
+        this.__internal__scanPlotStates();
+
+        const bestBerry = this.__internal__getBestBerryToPlant();
+        const canUseShovel = Automation.Utils.LocalStorage.getValue(this.Settings.UseShovel) === "true";
+
+        for (const plotState of this.__internal__plotStates) {
+            // Skip locked plots
+            if (!plotState.isUnlocked || plotState.isSafeLocked) {
+                continue;
+            }
+
+            // Handle empty plots
+            if (plotState.isEmpty) {
+                if (App.game.farming.hasBerry(bestBerry)) {
+                    App.game.farming.plant(plotState.index, bestBerry);
+                    this.__internal__plantedBerryCount++;
+                }
+                continue;
+            }
+
+            // Handle plots with wrong berries
+            if (plotState.berry !== bestBerry && canUseShovel) {
+                if (plotState.stage === PlotStage.Berry) {
+                    // Harvest if ripe
+                    App.game.farming.harvest(plotState.index);
+                    this.__internal__harvestCount++;
+                } else {
+                    // Shovel if not ripe
+                    App.game.farming.shovel(plotState.index);
+                }
+                // Plant best berry
+                if (App.game.farming.hasBerry(bestBerry)) {
+                    App.game.farming.plant(plotState.index, bestBerry);
+                    this.__internal__plantedBerryCount++;
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Performs optimal timing for harvesting
+     */
+    static __internal__optimalTimingHarvest() {
+        if (Automation.Utils.LocalStorage.getValue(this.Settings.OptimalTiming) !== "true") {
+            return;
+        }
+
+        this.__internal__scanPlotStates();
+
+        const richMulchEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.UseRichMulch) === "true";
+        const harvestLateEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.HarvestLate) === "true";
+
+        for (const plotState of this.__internal__plotStates) {
+            if (!plotState.isUnlocked || plotState.isEmpty || plotState.isSafeLocked) {
+                continue;
+            }
+
+            // Only harvest ripe berries
+            if (plotState.stage !== PlotStage.Berry) {
+                continue;
+            }
+
+            // Calculate optimal harvest time
+            const timeSinceRipe = plotState.age - (plotState.berryData?.growthTime[PlotStage.Bloom] || 0);
+            const totalBerryTime = plotState.berryData?.growthTime[PlotStage.Berry] || 0;
+            const timeUntilWither = totalBerryTime - timeSinceRipe;
+
+            let shouldHarvest = false;
+
+            if (harvestLateEnabled) {
+                // Harvest just before withering (within 30 seconds)
+                shouldHarvest = timeUntilWither < 30000;
+            } else {
+                // Harvest immediately when ripe
+                shouldHarvest = true;
+            }
+
+            if (shouldHarvest) {
+                // Apply rich mulch if enabled
+                if (richMulchEnabled && plotState.mulch === MulchType.None) {
+                    App.game.farming.addMulch(plotState.index, MulchType.Rich_Mulch);
+                }
+
+                App.game.farming.harvest(plotState.index);
+                this.__internal__harvestCount++;
+                this.__internal__freeSlotCount++;
+            }
+        }
+    }
+
+    /**
+     * @brief Detects and handles auto-mutations
+     */
+    static __internal__handleAutoMutations() {
+        if (Automation.Utils.LocalStorage.getValue(this.Settings.AutoMutations) !== "true") {
+            return;
+        }
+
+        // Check for active mutations
+        for (const mutation of App.game.farming.mutations) {
+            if (!mutation.unlocked) {
+                continue;
+            }
+
+            // Check if mutation conditions are met
+            const canMutate = this.__internal__canMutationOccur(mutation);
+            if (canMutate) {
+                this.__internal__executeMutation(mutation);
+            }
+        }
+    }
+
+    /**
+     * @brief Checks if a mutation can occur
+     *
+     * @param mutation: The mutation to check
+     *
+     * @returns True if mutation can occur
+     */
+    static __internal__canMutationOccur(mutation) {
+        // Check if mutation is already in progress
+        if (this.__internal__activeMutations.has(mutation.mutatedBerry)) {
+            return false;
+        }
+
+        // Check requirements
+        if (mutation.requirements) {
+            for (const req of mutation.requirements) {
+                if (req.type === 'berry') {
+                    // Check if required berry is planted
+                    const hasRequiredBerry = App.game.farming.plotList.some(
+                        plot => plot.berry === req.berry && plot.stage() === PlotStage.Berry
+                    );
+                    if (!hasRequiredBerry) {
+                        return false;
+                    }
+                } else if (req.type === 'oakItem') {
+                    // Check if oak item is active
+                    const oakItem = App.game.oakItems.itemList[req.item];
+                    if (!oakItem || !oakItem.isActive) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @brief Executes a mutation
+     *
+     * @param mutation: The mutation to execute
+     */
+    static __internal__executeMutation(mutation) {
+        // Mark mutation as active
+        this.__internal__activeMutations.set(mutation.mutatedBerry, Date.now());
+
+        // Plant required berries in optimal pattern
+        if (mutation.requirements) {
+            for (const req of mutation.requirements) {
+                if (req.type === 'berry') {
+                    // Find empty plots and plant required berry
+                    for (const plot of App.game.farming.plotList) {
+                        if (plot.isUnlocked && plot.isEmpty() && App.game.farming.hasBerry(req.berry)) {
+                            App.game.farming.plant(plot.index, req.berry);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Notify user
+        const berryName = BerryType[mutation.mutatedBerry];
+        Automation.Notifications.sendNotif(`Auto-mutation started for ${berryName} berry`, "Farming");
+    }
+
+    /**
+     * @brief Updates Farm Points optimization data
+     */
+    static __internal__updateFpOptimization() {
+        if (Automation.Utils.LocalStorage.getValue(this.Settings.MaximizeFarmPoints) !== "true") {
+            return;
+        }
+
+        const now = Date.now();
+        if ((now - this.__internal__fpOptimizationData.lastUpdate) < 10000) {
+            return; // Only update every 10 seconds
+        }
+
+        let bestBerry = BerryType.Cheri;
+        let bestFpPerMinute = 0;
+
+        for (let berryType = 0; berryType < Object.keys(BerryType).length / 2; berryType++) {
+            if (!App.game.farming.unlockedBerries[berryType]()) {
+                continue;
+            }
+
+            const fpPerMinute = this.__internal__calculateFpPerMinute(berryType);
+            if (fpPerMinute > bestFpPerMinute) {
+                bestFpPerMinute = fpPerMinute;
+                bestBerry = berryType;
+            }
+        }
+
+        this.__internal__fpOptimizationData.bestBerry = bestBerry;
+        this.__internal__fpOptimizationData.bestFpPerMinute = bestFpPerMinute;
+        this.__internal__fpOptimizationData.lastUpdate = now;
+
+        // Update floating panel with FP info
+        this.__internal__updateFpPanel();
+    }
+
+    /**
+     * @brief Updates the floating panel with Farm Points information
+     */
+    static __internal__updateFpPanel() {
+        if (!this.__internal__contentFloatingContentContainer) {
+            return;
+        }
+
+        const bestBerry = this.__internal__fpOptimizationData.bestBerry;
+        const bestFpPerMinute = this.__internal__fpOptimizationData.bestFpPerMinute;
+
+        if (bestBerry !== null && bestFpPerMinute > 0) {
+            const berryName = BerryType[bestBerry];
+            const berryImage = document.createElement("img");
+            berryImage.src = `assets/images/items/berry/${berryName}.png`;
+            berryImage.style.height = "20px";
+
+            const fpText = document.createElement("div");
+            fpText.style.marginTop = "5px";
+            fpText.style.fontSize = "11px";
+            fpText.style.color = "#4CAF50";
+            fpText.textContent = `Best FP/min: ${bestFpPerMinute.toFixed(1)}`;
+
+            // Add to existing content
+            const existingContent = this.__internal__contentFloatingContentContainer.innerHTML;
+            if (!existingContent.includes("Best FP/min")) {
+                this.__internal__contentFloatingContentContainer.appendChild(document.createElement("br"));
+                this.__internal__contentFloatingContentContainer.appendChild(fpText);
+            }
+        }
+    }
+
+    /**
+     * @brief Performs continuous adaptation based on game state
+     */
+    static __internal__continuousAdaptation() {
+        // Check for newly unlocked plots
+        this.__internal__tryToUnlockNewSpots();
+
+        // Check for newly unlocked berries
+        this.__internal__checkForNewBerries();
+
+        // Update berry scores periodically
+        if ((Date.now() - this.__internal__lastScoreCacheUpdate) > this.SCORE_CACHE_DURATION) {
+            this.__internal__berryScoreCache.clear();
+        }
+    }
+
+    /**
+     * @brief Checks for newly unlocked berries and updates selection
+     */
+    static __internal__checkForNewBerries() {
+        // Update berry dropdown if new berries are unlocked
+        if (this.__internal__lockedBerries.length > 0) {
+            for (let i = this.__internal__lockedBerries.length - 1; i >= 0; i--) {
+                const berryData = this.__internal__lockedBerries[i];
+                if (App.game.farming.unlockedBerries[berryData.berryId]()) {
+                    berryData.element.hidden = false;
+                    this.__internal__lockedBerries.splice(i, 1);
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Enhanced farm loop with all advanced features
+     */
+    static __internal__enhancedFarmLoop() {
+        // Run continuous adaptation
+        this.__internal__continuousAdaptation();
+
+        // Run smart plot management
+        this.__internal__smartPlotManagement();
+
+        // Run optimal timing harvest
+        this.__internal__optimalTimingHarvest();
+
+        // Run auto-mutations
+        this.__internal__handleAutoMutations();
+
+        // Update FP optimization
+        this.__internal__updateFpOptimization();
+
+        // Catch wanderers
+        this.__internal__catchWanderingPokemons();
     }
 }
