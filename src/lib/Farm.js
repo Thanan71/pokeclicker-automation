@@ -2908,7 +2908,7 @@ class AutomationFarm {
         let bestFpPerMinute = 0;
 
         for (let berryType = 0; berryType < Object.keys(BerryType).length / 2; berryType++) {
-            if (!App.game.farming.unlockedBerries[berryType]()) {
+            if (!this.__internal__isBerryUnlocked(berryType)) {
                 continue;
             }
 
