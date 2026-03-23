@@ -2499,6 +2499,17 @@ class AutomationFarm {
     \*********************************************************************/
 
     /**
+     * @brief Safely checks if a berry type is unlocked
+     *
+     * @param berryType: The type of berry to check
+     *
+     * @returns True if the berry is unlocked, false otherwise
+     */
+    static __internal__isBerryUnlocked(berryType) {
+        return typeof App.game.farming.unlockedBerries[berryType] === 'function' && App.game.farming.unlockedBerries[berryType]();
+    }
+
+    /**
      * @brief Calculates the Farm Points per minute for a given berry type
      *
      * @param berryType: The type of berry to calculate FP/min for
@@ -2506,7 +2517,7 @@ class AutomationFarm {
      * @returns The Farm Points per minute value
      */
     static __internal__calculateFpPerMinute(berryType) {
-        if (!App.game.farming.unlockedBerries[berryType]()) {
+        if (!this.__internal__isBerryUnlocked(berryType)) {
             return 0;
         }
 
@@ -2545,7 +2556,7 @@ class AutomationFarm {
             return this.__internal__berryScoreCache.get(berryType);
         }
 
-        if (!App.game.farming.unlockedBerries[berryType]()) {
+        if (!this.__internal__isBerryUnlocked(berryType)) {
             return 0;
         }
 
@@ -2636,14 +2647,20 @@ class AutomationFarm {
         let bestBerry = BerryType.Cheri;
         let bestScore = 0;
 
-        // Check all unlocked berries
-        for (let berryType = 0; berryType < Object.keys(BerryType).length / 2; berryType++) {
+        // Check all unlocked berries - iterate through the unlockedBerries array
+        for (let berryType = 0; berryType < App.game.farming.unlockedBerries.length; berryType++) {
+            // Skip if unlockedBerries[berryType] is not a function
+            if (typeof App.game.farming.unlockedBerries[berryType] !== 'function') {
+                continue;
+            }
+
+            // Check if unlocked (it's an observable)
             if (!App.game.farming.unlockedBerries[berryType]()) {
                 continue;
             }
 
             // Skip if no berries in inventory
-            if (App.game.farming.berryList[berryType]() === 0) {
+            if (!App.game.farming.berryList[berryType] || App.game.farming.berryList[berryType]() === 0) {
                 continue;
             }
 
