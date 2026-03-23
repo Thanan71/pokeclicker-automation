@@ -17,6 +17,104 @@ class AutomationFarm {
         MaxFarmPointsEnabled: "Farming-MaxFarmPointsEnabled"
     };
 
+    static __internal__buildMenu() {
+    const farmCategory = Automation.Menu.getOrCreateCategory("Farming", 15);
+
+    // Main toggle
+    Automation.Menu.addToggleButton(
+        farmCategory,
+        "Auto Farming",
+        this.Settings.FeatureEnabled,
+        "Enables / disables the whole farming automation",
+        () => this.toggleAutoFarming()
+    );
+
+    // ─────────────────────────────────────────
+    //          Your existing options
+    // ─────────────────────────────────────────
+
+    Automation.Menu.addSeparator(farmCategory);
+
+    Automation.Menu.addToggleButton(
+        farmCategory,
+        "Auto-catch wanderers",
+        this.Settings.AutoCatchWanderers,
+        "Automatically catch Pokémon that wander onto berries"
+    );
+
+    Automation.Menu.addToggleButton(
+        farmCategory,
+        "Harvest late (right before regrow)",
+        this.Settings.HarvestLate,
+        "Waits until the very last second before harvest → maximizes exp/mutations"
+    );
+
+    Automation.Menu.addToggleButton(
+        farmCategory,
+        "Use Rich Mulch when available",
+        this.Settings.UseRichMulch,
+        "Applies Rich Mulch automatically when possible"
+    );
+
+    Automation.Menu.addToggleButton(
+        farmCategory,
+        "Use Shovel (remove mismatches)",
+        this.Settings.UseShovel,
+        "Removes any berry that doesn't match the selected/target berry"
+    );
+
+    Automation.Menu.addToggleButton(
+        farmCategory,
+        "Colbur nonsense mode",
+        this.Settings.ColburNonsenseEnabled,
+        "Keeps only Colbur in a specific pattern (your custom logic)"
+    );
+
+    // ─────────────────────────────────────────
+    //          New Max Farm Points mode
+    // ─────────────────────────────────────────
+
+    Automation.Menu.addSeparator(farmCategory);
+
+    Automation.Menu.addToggleButton(
+        farmCategory,
+        "★★ Maximize Farm Points ★★",
+        this.Settings.MaxFarmPointsEnabled,
+        "Overrides normal planting → focuses purely on highest farm point / time berries\n(uses smart layout & value scoring)",
+        () => {
+            // Optional: force a farm loop tick when turning on
+            if (Automation.Utils.LocalStorage.getValue(this.Settings.MaxFarmPointsEnabled) === "true") {
+                this.__internal__farmLoop();
+            }
+        }
+    );
+
+    // Optional: berry selector (only shown when max mode is OFF)
+    const berrySelector = Automation.Menu.createSettingElement(
+        "Plant berry",
+        this.Settings.SelectedBerryToPlant,
+        "select",
+        Object.keys(BerryType)
+            .filter(k => isNaN(+k) && BerryType[k] !== BerryType.None)
+            .map(name => ({ value: BerryType[name], text: name }))
+    );
+
+    Automation.Menu.addAdvancedSetting(
+        farmCategory,
+        berrySelector,
+        () => Automation.Utils.LocalStorage.getValue(this.Settings.MaxFarmPointsEnabled) !== "true",
+        "Only active when Max Farm Points mode is OFF"
+    );
+
+    // Optional: focus on unlocks toggle
+    Automation.Menu.addToggleButton(
+        farmCategory,
+        "Focus on new unlocks first",
+        this.Settings.FocusOnUnlocks,
+        "Tries to plant new / mutation-required berries first"
+    );
+}
+
     static ForcePlantBerriesAsked = null;
 
     // =========================
