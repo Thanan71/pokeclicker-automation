@@ -128,10 +128,6 @@ class AutomationFarm {
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.UseShovel, false);
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.SelectedBerryToPlant, BerryType.Cheri);
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.ColburNonsenseEnabled, false);
-
-            // 🔥 NEW
-            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.MaxFarmPointsEnabled, false);
-
             this.__internal__buildMenu();
         }
         else if (initStep == Automation.InitSteps.Finalize) {
