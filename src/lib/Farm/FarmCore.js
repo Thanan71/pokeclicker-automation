@@ -554,7 +554,13 @@ class AutomationFarm
     static __maintainColburNonsense()
     {
         const layout = this.__desiredLayout;
-        if (!layout) return;
+        if (!layout)
+        {
+            console.log("❌ Colbur Nonsense: Layout is null");
+            return;
+        }
+
+        console.log("🔄 Colbur Nonsense: Maintaining layout");
 
         App.game.farming.plotList.forEach((plot, index) =>
         {
@@ -581,7 +587,12 @@ class AutomationFarm
             {
                 if (App.game.farming.hasBerry(desiredBerry))
                 {
+                    console.log(`🌱 Colbur Nonsense: Planting berry ${desiredBerry} at index ${index}`);
                     App.game.farming.plant(index, desiredBerry);
+                }
+                else
+                {
+                    console.log(`❌ Colbur Nonsense: Don't have berry ${desiredBerry} to plant at index ${index}`);
                 }
             }
             // If plot has a different berry than desired, replace it
@@ -600,6 +611,7 @@ class AutomationFarm
                 // Plant the desired berry if we want one there
                 if (desiredBerry !== 0 && App.game.farming.hasBerry(desiredBerry))
                 {
+                    console.log(`🌱 Colbur Nonsense: Planting berry ${desiredBerry} at index ${index}`);
                     App.game.farming.plant(index, desiredBerry);
                 }
             }
