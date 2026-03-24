@@ -58,7 +58,13 @@ class AutomationFarm {
                 // Cheri   Cheri   Cheri  Cheri  Cheri
                 // Cheri   Colbur  Cheri  Colbur Cheri
                 // Cheri   Cheri   Cheri  Cheri  Cheri
-                this.__desiredLayout = [50, 64, 1, 1, 1, 45, 45, 1, 51, 1, 1, 1, 1, 1, 1, 1, 51, 1, 51, 1, 1, 1, 1, 1, 1];
+                this.__desiredLayout = [
+                    50, 64, 0, 0, 0,   // Babiri, Petaya, Cheri, Cheri, Cheri
+                    45, 45, 0, 51, 0,  // Payapa, Payapa, Cheri, Colbur, Cheri
+                    0,  0,  0,  0,  0, // Cheri x5
+                    0, 51, 0, 51, 0,   // Cheri, Colbur, Cheri, Colbur, Cheri
+                    0,  0,  0,  0,  0  // Cheri x5
+                ];
                 console.log("✅ Colbur Nonsense: Layout loaded:", this.__desiredLayout);
             }
             else {
@@ -124,7 +130,13 @@ class AutomationFarm {
             // Cheri   Cheri   Cheri  Cheri  Cheri
             // Cheri   Colbur  Cheri  Colbur Cheri
             // Cheri   Cheri   Cheri  Cheri  Cheri
-            this.__desiredLayout = [50, 64, 1, 1, 1, 45, 45, 1, 51, 1, 1, 1, 1, 1, 1, 1, 51, 1, 51, 1, 1, 1, 1, 1, 1];
+            this.__desiredLayout = [
+                50, 64, 0, 0, 0,   // Babiri, Petaya, Cheri, Cheri, Cheri
+                45, 45, 0, 51, 0,  // Payapa, Payapa, Cheri, Colbur, Cheri
+                0,  0,  0,  0,  0, // Cheri x5
+                0, 51, 0, 51, 0,   // Cheri, Colbur, Cheri, Colbur, Cheri
+                0,  0,  0,  0,  0  // Cheri x5
+            ];
             console.log("✅ Colbur Nonsense: Mode enabled with layout:", this.__desiredLayout);
             console.log("✅ Colbur Nonsense: UseShovel set to true");
             console.log("✅ Colbur Nonsense: HarvestLate set to true");
