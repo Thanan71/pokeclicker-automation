@@ -151,6 +151,8 @@ class AutomationFarm
      */
     static __buildMenu()
     {
+        console.log("🔧 Colbur Nonsense: Building menu");
+
         // Build main menu using FarmMenuBuilder
         const { farmingContainer, autoFarmingButton } = FarmMenuBuilder.buildMenu(
             this.Settings,
@@ -161,6 +163,7 @@ class AutomationFarm
         // Only display the menu when the farm is unlocked
         if (!App.game.farming.canAccess())
         {
+            console.log("🔒 Colbur Nonsense: Farm not accessible, hiding menu");
             this.__farmingContainer.hidden = true;
             this.__setFarmingUnlockWatcher();
         }
@@ -173,11 +176,13 @@ class AutomationFarm
         );
 
         // Build Colbur Nonsense toggle
+        console.log("🔧 Colbur Nonsense: Building toggle button");
         FarmMenuBuilder.buildColburNonsenseToggle(
             farmingSettingPanel,
             this.Settings,
             () => {
                 const currentState = Automation.Utils.LocalStorage.getValue(this.Settings.ColburNonsenseEnabled) === "true";
+                console.log(`🔧 Colbur Nonsense: Toggle clicked, current state: ${currentState}`);
                 this.toggleColburNonsense(!currentState);
             }
         );
@@ -189,6 +194,8 @@ class AutomationFarm
         const { contentFloatingContainer, contentFloatingContentContainer } = FarmMenuBuilder.createFloatingModal("farmModal");
         this.__contentFloatingContainer = contentFloatingContainer;
         this.__contentFloatingContentContainer = contentFloatingContentContainer;
+
+        console.log("✅ Colbur Nonsense: Menu built successfully");
     }
 
     /**
@@ -310,6 +317,11 @@ class AutomationFarm
     static __farmLoop()
     {
         const colburNonsenseEnabled = Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled);
+        const featureEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.FeatureEnabled) === "true";
+
+        console.log("🔄 Farm Loop: Starting iteration");
+        console.log(`📊 Farm Loop: Feature enabled: ${featureEnabled}, Colbur Nonsense enabled: ${colburNonsenseEnabled}`);
+        console.log(`📊 Farm Loop: Desired layout: ${this.__desiredLayout}`);
 
         // If Colbur Nonsense is enabled, ONLY run Colbur Nonsense logic
         if (colburNonsenseEnabled)
@@ -440,13 +452,16 @@ class AutomationFarm
     }
 
     /**
-     * @brief Maintains Colbur Nonsense layout
+     * @brief Maintains Colbur Nonsense layout with proper timing
      * Layout: [51, 64, 0, 0, 0, 45, 45, 0, 50, 0, 0, 0, 0, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 0, 0]
      * - Index 0: Colbur (51) - harvest when ripe, replant
      * - Index 1: Petaya (64)
      * - Index 5,6: Payapa (45)
      * - Index 8,15,17: Babiri (50)
      * - Others: empty
+     *
+     * Timing strategy: Different berries have different growth times.
+     * We need to plant them so they all reach Berry stage at the same time.
      */
     static __maintainColburNonsense()
     {
@@ -460,7 +475,10 @@ class AutomationFarm
         console.log("🔄 Colbur Nonsense: Starting maintenance with layout:", layout);
 
         let actionsPerformed = 0;
+        const overallGrowthMultiplier = App.game.farming.getGrowthMultiplier();
 
+        // First pass: Check all plots and collect timing information
+        const plotStates = [];
         App.game.farming.plotList.forEach((plot, index) =>
         {
             const desiredBerry = layout[index] ?? 0;
@@ -469,17 +487,43 @@ class AutomationFarm
             const stage = plot.stage();
 
             // Skip locked plots
-            if (!plot.isUnlocked)
+            if (!plot.isUnlocked || plot.isSafeLocked)
             {
-                console.log(`🔒 Colbur Nonsense: Plot ${index} is locked, skipping`);
                 return;
             }
 
-            if (plot.isSafeLocked)
+            // Calculate time until Berry stage if berry is growing
+            let timeUntilBerry = 0;
+            if (!isEmpty && stage !== PlotStage.Berry)
             {
-                console.log(`🔒 Colbur Nonsense: Plot ${index} is safe locked, skipping`);
-                return;
+                timeUntilBerry = FarmPlotManager.getTimeUntilStage(plot, PlotStage.Berry, overallGrowthMultiplier);
             }
+
+            plotStates.push({
+                index,
+                desiredBerry,
+                currentBerry,
+                isEmpty,
+                stage,
+                timeUntilBerry,
+                plot
+            });
+        });
+
+        // Find the maximum time until Berry stage among all growing berries
+        let maxTimeUntilBerry = 0;
+        const growingBerries = plotStates.filter(state => !state.isEmpty && state.stage !== PlotStage.Berry);
+
+        if (growingBerries.length > 0)
+        {
+            maxTimeUntilBerry = Math.max(...growingBerries.map(state => state.timeUntilBerry));
+            console.log(`📊 Colbur Nonsense: Max time until Berry stage: ${maxTimeUntilBerry.toFixed(1)}s`);
+        }
+
+        // Second pass: Perform actions based on timing
+        plotStates.forEach(state =>
+        {
+            const { index, desiredBerry, currentBerry, isEmpty, stage, timeUntilBerry, plot } = state;
 
             // Case 1: Plot has a berry but we want it empty
             if (!isEmpty && desiredBerry === 0)
@@ -538,32 +582,67 @@ class AutomationFarm
                     console.log(`⚠️ Colbur Nonsense: Cannot plant ${BerryType[desiredBerry]} at plot ${index} - not enough berries in inventory`);
                 }
             }
-            // Case 4: Plot has the correct berry and it's ripe - harvest and replant
+            // Case 4: Plot has the correct berry and it's ripe
             else if (!isEmpty && currentBerry === desiredBerry && stage === PlotStage.Berry)
             {
-                console.log(`🌾 Colbur Nonsense: Harvesting ripe ${BerryType[currentBerry]} at plot ${index}`);
-                App.game.farming.harvest(index);
-                actionsPerformed++;
-                // Replant the same berry after harvest
-                if (App.game.farming.hasBerry(desiredBerry))
+                // Check if we should harvest based on timing
+                // If there are other berries still growing, we might want to wait
+                const shouldHarvest = this.__shouldHarvestColburBerry(growingBerries, maxTimeUntilBerry);
+
+                if (shouldHarvest)
                 {
-                    console.log(`🌱 Colbur Nonsense: Replanting ${BerryType[desiredBerry]} at plot ${index} after harvest`);
-                    App.game.farming.plant(index, desiredBerry);
+                    console.log(`🌾 Colbur Nonsense: Harvesting ripe ${BerryType[currentBerry]} at plot ${index}`);
+                    App.game.farming.harvest(index);
                     actionsPerformed++;
+                    // Replant the same berry after harvest
+                    if (App.game.farming.hasBerry(desiredBerry))
+                    {
+                        console.log(`🌱 Colbur Nonsense: Replanting ${BerryType[desiredBerry]} at plot ${index} after harvest`);
+                        App.game.farming.plant(index, desiredBerry);
+                        actionsPerformed++;
+                    }
+                    else
+                    {
+                        console.log(`⚠️ Colbur Nonsense: Cannot replant ${BerryType[desiredBerry]} at plot ${index} - not enough berries in inventory`);
+                    }
                 }
                 else
                 {
-                    console.log(`⚠️ Colbur Nonsense: Cannot replant ${BerryType[desiredBerry]} at plot ${index} - not enough berries in inventory`);
+                    console.log(`⏳ Colbur Nonsense: Waiting for other berries to sync before harvesting ${BerryType[currentBerry]} at plot ${index}`);
                 }
             }
             // Case 5: Plot has the correct berry but it's not ripe yet
             else if (!isEmpty && currentBerry === desiredBerry && stage !== PlotStage.Berry)
             {
-                console.log(`⏳ Colbur Nonsense: Plot ${index} has ${BerryType[currentBerry]} growing (stage: ${stage}), waiting...`);
+                console.log(`⏳ Colbur Nonsense: Plot ${index} has ${BerryType[currentBerry]} growing (stage: ${stage}, time until Berry: ${timeUntilBerry.toFixed(1)}s)`);
             }
         });
 
         console.log(`✅ Colbur Nonsense: Maintenance complete - ${actionsPerformed} actions performed`);
+    }
+
+    /**
+     * @brief Determines if a Colbur Berry should be harvested based on timing
+     * @param growingBerries: Array of berries that are still growing
+     * @param maxTimeUntilBerry: Maximum time until any berry reaches Berry stage
+     * @returns True if the berry should be harvested, false otherwise
+     */
+    static __shouldHarvestColburBerry(growingBerries, maxTimeUntilBerry)
+    {
+        // If no berries are growing, harvest immediately
+        if (growingBerries.length === 0)
+        {
+            return true;
+        }
+
+        // If the max time is very short (less than 30 seconds), wait for synchronization
+        if (maxTimeUntilBerry < 30)
+        {
+            return false;
+        }
+
+        // Otherwise, harvest to allow replanting and maintain the cycle
+        return true;
     }
 
     /**
