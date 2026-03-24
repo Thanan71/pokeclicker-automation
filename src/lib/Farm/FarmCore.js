@@ -312,11 +312,19 @@ class AutomationFarm
         // Run enhanced farming features first
         this.__enhancedFarmLoop();
 
-        this.__harvestAsEfficientAsPossible();
+        const colburNonsenseEnabled = Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled);
 
-        if (Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled))
+        // Only run normal harvest logic if Colbur Nonsense is NOT enabled
+        if (!colburNonsenseEnabled)
+        {
+            this.__harvestAsEfficientAsPossible();
+        }
+
+        if (colburNonsenseEnabled)
         {
             this.__maintainColburNonsense();
+            // Skip normal farming logic when Colbur Nonsense is enabled
+            return;
         }
 
         // Try to unlock berries, if enabled
