@@ -126,6 +126,7 @@ class AutomationFarm
     {
         if (enable)
         {
+            Automation.Utils.LocalStorage.setValue(this.Settings.ColburNonsenseEnabled, true);
             Automation.Utils.LocalStorage.setValue(this.Settings.UseShovel, true);
             Automation.Utils.LocalStorage.setValue(this.Settings.HarvestLate, true);
             this.__desiredLayout = [51, 64, 0, 0, 0, 45, 45, 0, 50, 0, 0, 0, 0, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 0, 0];
@@ -133,6 +134,7 @@ class AutomationFarm
         }
         else
         {
+            Automation.Utils.LocalStorage.setValue(this.Settings.ColburNonsenseEnabled, false);
             this.__desiredLayout = null;
         }
     }
