@@ -452,16 +452,17 @@ class AutomationFarm
     }
 
     /**
-     * @brief Maintains Colbur Nonsense layout with proper timing
+     * @brief Maintains Colbur Nonsense layout for Farm Points optimization
      * Layout: [51, 64, 0, 0, 0, 45, 45, 0, 50, 0, 0, 0, 0, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 0, 0]
-     * - Index 0: Colbur (51) - harvest when ripe, replant
-     * - Index 1: Petaya (64)
-     * - Index 5,6: Payapa (45)
-     * - Index 8,15,17: Babiri (50)
-     * - Others: empty
+     * - Index 0: Colbur (51) - harvest when ripe, replant Cheri (Colbur will overtake Cheri again)
+     * - Index 1: Petaya (64) - protected by Babiri
+     * - Index 5,6: Payapa (45) - Mutation Chance up aura
+     * - Index 8,15,17: Babiri (50) - protects Petaya
+     * - Others: empty (can plant Cheri for Colbur to overtake)
      *
-     * Timing strategy: Different berries have different growth times.
-     * We need to plant them so they all reach Berry stage at the same time.
+     * Strategy: Colbur is a Parasite Berry that overtakes Cheri.
+     * Harvest Colbur when ripe, then replant Cheri. Colbur will overtake Cheri again.
+     * This maximizes Farm Points per second (Colbur gives 2300 FP vs Cheri's 5 FP).
      */
     static __maintainColburNonsense()
     {
@@ -475,10 +476,8 @@ class AutomationFarm
         console.log("🔄 Colbur Nonsense: Starting maintenance with layout:", layout);
 
         let actionsPerformed = 0;
-        const overallGrowthMultiplier = App.game.farming.getGrowthMultiplier();
 
-        // First pass: Check all plots and collect timing information
-        const plotStates = [];
+        // Process each plot
         App.game.farming.plotList.forEach((plot, index) =>
         {
             const desiredBerry = layout[index] ?? 0;
@@ -492,70 +491,112 @@ class AutomationFarm
                 return;
             }
 
-            // Calculate time until Berry stage if berry is growing
-            let timeUntilBerry = 0;
-            if (!isEmpty && stage !== PlotStage.Berry)
+            // Special handling for Colbur plot (index 0)
+            if (index === 0)
             {
-                timeUntilBerry = FarmPlotManager.getTimeUntilStage(plot, PlotStage.Berry, overallGrowthMultiplier);
-            }
-
-            plotStates.push({
-                index,
-                desiredBerry,
-                currentBerry,
-                isEmpty,
-                stage,
-                timeUntilBerry,
-                plot
-            });
-        });
-
-        // Find the maximum time until Berry stage among all growing berries
-        let maxTimeUntilBerry = 0;
-        const growingBerries = plotStates.filter(state => !state.isEmpty && state.stage !== PlotStage.Berry);
-
-        if (growingBerries.length > 0)
-        {
-            maxTimeUntilBerry = Math.max(...growingBerries.map(state => state.timeUntilBerry));
-            console.log(`📊 Colbur Nonsense: Max time until Berry stage: ${maxTimeUntilBerry.toFixed(1)}s`);
-        }
-
-        // Second pass: Perform actions based on timing
-        plotStates.forEach(state =>
-        {
-            const { index, desiredBerry, currentBerry, isEmpty, stage, timeUntilBerry, plot } = state;
-
-            // Case 1: Plot has a berry but we want it empty
-            if (!isEmpty && desiredBerry === 0)
-            {
-                if (stage === PlotStage.Berry)
+                // If Colbur is ripe, harvest it and replant Cheri
+                if (!isEmpty && currentBerry === BerryType.Colbur && stage === PlotStage.Berry)
                 {
-                    console.log(`🌾 Colbur Nonsense: Harvesting berry ${BerryType[currentBerry]} at plot ${index} (want empty)`);
+                    console.log(`🌾 Colbur Nonsense: Harvesting ripe Colbur at plot ${index} for Farm Points`);
                     App.game.farming.harvest(index);
                     actionsPerformed++;
+
+                    // Replant Cheri so Colbur can overtake it again
+                    if (App.game.farming.hasBerry(BerryType.Cheri))
+                    {
+                        console.log(`🌱 Colbur Nonsense: Replanting Cheri at plot ${index} (Colbur will overtake)`);
+                        App.game.farming.plant(index, BerryType.Cheri);
+                        actionsPerformed++;
+                    }
+                    else
+                    {
+                        console.log(`⚠️ Colbur Nonsense: Cannot replant Cheri at plot ${index} - not enough berries`);
+                    }
                 }
-                else
+                // If Colbur overtook at a non-Berry stage, shovel it and replant Cheri
+                else if (!isEmpty && currentBerry === BerryType.Colbur && stage !== PlotStage.Berry)
                 {
-                    console.log(`🔧 Colbur Nonsense: Shoveling berry ${BerryType[currentBerry]} at plot ${index} (want empty, stage: ${stage})`);
+                    console.log(`🔧 Colbur Nonsense: Shoveling Colbur at plot ${index} (not at Berry stage)`);
                     App.game.farming.shovel(index);
                     actionsPerformed++;
+
+                    if (App.game.farming.hasBerry(BerryType.Cheri))
+                    {
+                        console.log(`🌱 Colbur Nonsense: Replanting Cheri at plot ${index}`);
+                        App.game.farming.plant(index, BerryType.Cheri);
+                        actionsPerformed++;
+                    }
+                }
+                // If plot is empty, plant Cheri
+                else if (isEmpty)
+                {
+                    if (App.game.farming.hasBerry(BerryType.Cheri))
+                    {
+                        console.log(`🌱 Colbur Nonsense: Planting Cheri at plot ${index} (for Colbur to overtake)`);
+                        App.game.farming.plant(index, BerryType.Cheri);
+                        actionsPerformed++;
+                    }
+                    else
+                    {
+                        console.log(`⚠️ Colbur Nonsense: Cannot plant Cheri at plot ${index} - not enough berries`);
+                    }
+                }
+                // If Cheri is growing, just wait
+                else if (!isEmpty && currentBerry === BerryType.Cheri)
+                {
+                    console.log(`⏳ Colbur Nonsense: Cheri growing at plot ${index}, waiting for Colbur to overtake`);
                 }
             }
-            // Case 2: Plot is empty and we want a berry there
-            else if (isEmpty && desiredBerry !== 0)
+            // Handle empty plots (can plant Cheri for Colbur to overtake)
+            else if (desiredBerry === 0)
             {
-                if (App.game.farming.hasBerry(desiredBerry))
+                // If plot has a berry, harvest or shovel it
+                if (!isEmpty)
                 {
-                    console.log(`🌱 Colbur Nonsense: Planting ${BerryType[desiredBerry]} at plot ${index}`);
-                    App.game.farming.plant(index, desiredBerry);
+                    if (stage === PlotStage.Berry)
+                    {
+                        console.log(`🌾 Colbur Nonsense: Harvesting berry ${BerryType[currentBerry]} at plot ${index} (want empty)`);
+                        App.game.farming.harvest(index);
+                        actionsPerformed++;
+                    }
+                    else
+                    {
+                        console.log(`🔧 Colbur Nonsense: Shoveling berry ${BerryType[currentBerry]} at plot ${index} (want empty)`);
+                        App.game.farming.shovel(index);
+                        actionsPerformed++;
+                    }
+                }
+                // Optionally plant Cheri in empty plots for more Colbur opportunities
+                else if (isEmpty && App.game.farming.hasBerry(BerryType.Cheri))
+                {
+                    console.log(`🌱 Colbur Nonsense: Planting Cheri at plot ${index} (optional for Colbur)`);
+                    App.game.farming.plant(index, BerryType.Cheri);
                     actionsPerformed++;
+                }
+            }
+            // Handle other berries (Petaya, Payapa, Babiri) - just maintain them
+            else if (!isEmpty && currentBerry === desiredBerry)
+            {
+                // If berry is ripe, harvest and replant
+                if (stage === PlotStage.Berry)
+                {
+                    console.log(`🌾 Colbur Nonsense: Harvesting ripe ${BerryType[currentBerry]} at plot ${index}`);
+                    App.game.farming.harvest(index);
+                    actionsPerformed++;
+
+                    if (App.game.farming.hasBerry(desiredBerry))
+                    {
+                        console.log(`🌱 Colbur Nonsense: Replanting ${BerryType[desiredBerry]} at plot ${index}`);
+                        App.game.farming.plant(index, desiredBerry);
+                        actionsPerformed++;
+                    }
                 }
                 else
                 {
-                    console.log(`⚠️ Colbur Nonsense: Cannot plant ${BerryType[desiredBerry]} at plot ${index} - not enough berries in inventory`);
+                    console.log(`⏳ Colbur Nonsense: ${BerryType[currentBerry]} growing at plot ${index} (stage: ${stage})`);
                 }
             }
-            // Case 3: Plot has a different berry than desired
+            // If wrong berry, remove it and plant correct one
             else if (!isEmpty && currentBerry !== desiredBerry)
             {
                 if (stage === PlotStage.Berry)
@@ -566,55 +607,31 @@ class AutomationFarm
                 }
                 else
                 {
-                    console.log(`🔧 Colbur Nonsense: Shoveling wrong berry ${BerryType[currentBerry]} at plot ${index} (want ${BerryType[desiredBerry]}, stage: ${stage})`);
+                    console.log(`🔧 Colbur Nonsense: Shoveling wrong berry ${BerryType[currentBerry]} at plot ${index} (want ${BerryType[desiredBerry]})`);
                     App.game.farming.shovel(index);
                     actionsPerformed++;
                 }
-                // Plant the desired berry after clearing
+
                 if (desiredBerry !== 0 && App.game.farming.hasBerry(desiredBerry))
                 {
-                    console.log(`🌱 Colbur Nonsense: Planting ${BerryType[desiredBerry]} at plot ${index} after clearing`);
+                    console.log(`🌱 Colbur Nonsense: Planting ${BerryType[desiredBerry]} at plot ${index}`);
                     App.game.farming.plant(index, desiredBerry);
                     actionsPerformed++;
                 }
-                else if (desiredBerry !== 0)
-                {
-                    console.log(`⚠️ Colbur Nonsense: Cannot plant ${BerryType[desiredBerry]} at plot ${index} - not enough berries in inventory`);
-                }
             }
-            // Case 4: Plot has the correct berry and it's ripe
-            else if (!isEmpty && currentBerry === desiredBerry && stage === PlotStage.Berry)
+            // If plot is empty and should have a berry, plant it
+            else if (isEmpty && desiredBerry !== 0)
             {
-                // Check if we should harvest based on timing
-                // If there are other berries still growing, we might want to wait
-                const shouldHarvest = this.__shouldHarvestColburBerry(growingBerries, maxTimeUntilBerry);
-
-                if (shouldHarvest)
+                if (App.game.farming.hasBerry(desiredBerry))
                 {
-                    console.log(`🌾 Colbur Nonsense: Harvesting ripe ${BerryType[currentBerry]} at plot ${index}`);
-                    App.game.farming.harvest(index);
+                    console.log(`🌱 Colbur Nonsense: Planting ${BerryType[desiredBerry]} at plot ${index}`);
+                    App.game.farming.plant(index, desiredBerry);
                     actionsPerformed++;
-                    // Replant the same berry after harvest
-                    if (App.game.farming.hasBerry(desiredBerry))
-                    {
-                        console.log(`🌱 Colbur Nonsense: Replanting ${BerryType[desiredBerry]} at plot ${index} after harvest`);
-                        App.game.farming.plant(index, desiredBerry);
-                        actionsPerformed++;
-                    }
-                    else
-                    {
-                        console.log(`⚠️ Colbur Nonsense: Cannot replant ${BerryType[desiredBerry]} at plot ${index} - not enough berries in inventory`);
-                    }
                 }
                 else
                 {
-                    console.log(`⏳ Colbur Nonsense: Waiting for other berries to sync before harvesting ${BerryType[currentBerry]} at plot ${index}`);
+                    console.log(`⚠️ Colbur Nonsense: Cannot plant ${BerryType[desiredBerry]} at plot ${index} - not enough berries`);
                 }
-            }
-            // Case 5: Plot has the correct berry but it's not ripe yet
-            else if (!isEmpty && currentBerry === desiredBerry && stage !== PlotStage.Berry)
-            {
-                console.log(`⏳ Colbur Nonsense: Plot ${index} has ${BerryType[currentBerry]} growing (stage: ${stage}, time until Berry: ${timeUntilBerry.toFixed(1)}s)`);
             }
         });
 
@@ -643,6 +660,146 @@ class AutomationFarm
 
         // Otherwise, harvest to allow replanting and maintain the cycle
         return true;
+    }
+
+    /**
+     * @brief Determines if a berry should be planted now based on timing synchronization
+     * @param berryType: The type of berry to plant
+     * @param maxGrowthTime: The maximum growth time among all berries
+     * @param plantingOrder: Array of {berryType, growthTime} sorted by growth time
+     * @param growingBerries: Array of berries that are currently growing
+     * @returns True if the berry should be planted now, false otherwise
+     */
+    static __shouldPlantBerryNow(berryType, maxGrowthTime, plantingOrder, growingBerries)
+    {
+        // If no berries are growing, plant immediately
+        if (growingBerries.length === 0)
+        {
+            return true;
+        }
+
+        // Find this berry's growth time
+        const berryInfo = plantingOrder.find(item => item.berryType === berryType);
+        if (!berryInfo)
+        {
+            return true; // Berry not in order, plant immediately
+        }
+
+        const berryGrowthTime = berryInfo.growthTime;
+        const timeOffset = maxGrowthTime - berryGrowthTime;
+
+        // If this berry has the longest growth time, plant it first
+        if (timeOffset === 0)
+        {
+            return true;
+        }
+
+        // Check if there are berries with longer growth times still growing
+        const longerBerriesGrowing = growingBerries.filter(state => {
+            const longerBerryInfo = plantingOrder.find(item => item.berryType === state.currentBerry);
+            return longerBerryInfo && longerBerryInfo.growthTime > berryGrowthTime;
+        });
+
+        // If there are longer berries still growing, wait
+        if (longerBerriesGrowing.length > 0)
+        {
+            // Check if the longer berries are close to being ready
+            const maxTimeUntilReady = Math.max(...longerBerriesGrowing.map(state => state.timeUntilBerry));
+
+            // If longer berries will be ready soon (within offset time), wait
+            if (maxTimeUntilReady <= timeOffset)
+            {
+                return false;
+            }
+        }
+
+        // Otherwise, plant now
+        return true;
+    }
+
+    /**
+     * @brief Calculates the optimal planting order for Colbur Nonsense berries
+     * to ensure they all reach Berry stage at the same time.
+     * @returns Array of {berryType, growthTime} sorted by growth time (longest first)
+     */
+    static __getColburNonsensePlantingOrder()
+    {
+        const layout = this.__desiredLayout;
+        if (!layout)
+        {
+            return [];
+        }
+
+        // Get unique berry types from layout (excluding 0 = empty)
+        const berryTypes = [...new Set(layout.filter(b => b !== 0))];
+
+        // Calculate growth time for each berry type
+        const berryGrowthTimes = berryTypes.map(berryType => {
+            const berryData = App.game.farming.berryData[berryType];
+            const growthTime = berryData.growthTime[PlotStage.Berry];
+            return { berryType, growthTime };
+        });
+
+        // Sort by growth time (longest first - these should be planted first)
+        berryGrowthTimes.sort((a, b) => b.growthTime - a.growthTime);
+
+        console.log("📊 Colbur Nonsense: Planting order (longest growth time first):");
+        berryGrowthTimes.forEach((item, index) => {
+            console.log(`  ${index + 1}. ${BerryType[item.berryType]}: ${item.growthTime}s`);
+        });
+
+        return berryGrowthTimes;
+    }
+
+    /**
+     * @brief Plants berries in the correct order to synchronize their maturity
+     */
+    static __plantColburNonsenseWithTiming()
+    {
+        const layout = this.__desiredLayout;
+        if (!layout)
+        {
+            return;
+        }
+
+        const plantingOrder = this.__getColburNonsensePlantingOrder();
+        if (plantingOrder.length === 0)
+        {
+            return;
+        }
+
+        // Find the longest growth time
+        const maxGrowthTime = plantingOrder[0].growthTime;
+
+        // Plant each berry type with appropriate timing
+        plantingOrder.forEach(({ berryType, growthTime }) =>
+        {
+            // Calculate time offset needed
+            const timeOffset = maxGrowthTime - growthTime;
+
+            // Find all plots that should have this berry
+            const plotIndexes = layout.map((berry, index) => berry === berryType ? index : -1).filter(index => index !== -1);
+
+            console.log(`🌱 Colbur Nonsense: Planting ${BerryType[berryType]} (growth time: ${growthTime}s, offset: ${timeOffset}s)`);
+
+            // Plant in all designated plots
+            plotIndexes.forEach(index =>
+            {
+                const plot = App.game.farming.plotList[index];
+                if (plot.isUnlocked && !plot.isSafeLocked && plot.isEmpty())
+                {
+                    if (App.game.farming.hasBerry(berryType))
+                    {
+                        App.game.farming.plant(index, berryType);
+                        console.log(`  ✅ Planted at plot ${index}`);
+                    }
+                    else
+                    {
+                        console.log(`  ⚠️ Cannot plant at plot ${index} - not enough berries`);
+                    }
+                }
+            });
+        });
     }
 
     /**
