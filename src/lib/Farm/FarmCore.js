@@ -51,7 +51,6 @@ class AutomationFarm {
 
             // Load Colbur Nonsense layout if enabled
             if (Automation.Utils.LocalStorage.getValue(this.Settings.ColburNonsenseEnabled) === "true") {
-                console.log("🔄 Colbur Nonsense: Loading layout from localStorage (was enabled)");
                 // Layout from wiki:
                 // Babiri  Petaya  Cheri  Cheri  Cheri
                 // Payapa  Payapa  Cheri  Colbur Cheri
@@ -65,11 +64,8 @@ class AutomationFarm {
                     0, 51, 0, 51, 0,   // Cheri, Colbur, Cheri, Colbur, Cheri
                     0,  0,  0,  0,  0  // Cheri x5
                 ];
-                console.log("✅ Colbur Nonsense: Layout loaded:", this.__desiredLayout);
             }
-            else {
-                console.log("ℹ️ Colbur Nonsense: Mode not enabled during initialization");
-            }
+
 
             this.__buildMenu();
         }
@@ -120,7 +116,6 @@ class AutomationFarm {
      */
     static toggleColburNonsense(enable) {
         if (enable) {
-            console.log("🔧 Colbur Nonsense: Enabling mode");
             Automation.Utils.LocalStorage.setValue(this.Settings.ColburNonsenseEnabled, true);
             Automation.Utils.LocalStorage.setValue(this.Settings.UseShovel, true);
             Automation.Utils.LocalStorage.setValue(this.Settings.HarvestLate, true);
@@ -137,15 +132,10 @@ class AutomationFarm {
                 0, 51, 0, 51, 0,   // Cheri, Colbur, Cheri, Colbur, Cheri
                 0,  0,  0,  0,  0  // Cheri x5
             ];
-            console.log("✅ Colbur Nonsense: Mode enabled with layout:", this.__desiredLayout);
-            console.log("✅ Colbur Nonsense: UseShovel set to true");
-            console.log("✅ Colbur Nonsense: HarvestLate set to true");
         }
         else {
-            console.log("🔧 Colbur Nonsense: Disabling mode");
             Automation.Utils.LocalStorage.setValue(this.Settings.ColburNonsenseEnabled, false);
             this.__desiredLayout = null;
-            console.log("✅ Colbur Nonsense: Mode disabled, layout cleared");
         }
     }
 
@@ -157,7 +147,6 @@ class AutomationFarm {
      * @brief Builds the complete menu
      */
     static __buildMenu() {
-        console.log("🔧 Colbur Nonsense: Building menu");
 
         // Build main menu using FarmMenuBuilder
         const { farmingContainer, autoFarmingButton } = FarmMenuBuilder.buildMenu(
@@ -168,7 +157,6 @@ class AutomationFarm {
 
         // Only display the menu when the farm is unlocked
         if (!App.game.farming.canAccess()) {
-            console.log("🔒 Colbur Nonsense: Farm not accessible, hiding menu");
             this.__farmingContainer.hidden = true;
             this.__setFarmingUnlockWatcher();
         }
@@ -181,13 +169,11 @@ class AutomationFarm {
         );
 
         // Build Colbur Nonsense toggle
-        console.log("🔧 Colbur Nonsense: Building toggle button");
         FarmMenuBuilder.buildColburNonsenseToggle(
             farmingSettingPanel,
             this.Settings,
             () => {
                 const currentState = Automation.Utils.LocalStorage.getValue(this.Settings.ColburNonsenseEnabled) === "true";
-                console.log(`🔧 Colbur Nonsense: Toggle clicked, current state: ${currentState}`);
                 this.toggleColburNonsense(!currentState);
             }
         );
@@ -200,7 +186,6 @@ class AutomationFarm {
         this.__contentFloatingContainer = contentFloatingContainer;
         this.__contentFloatingContentContainer = contentFloatingContentContainer;
 
-        console.log("✅ Colbur Nonsense: Menu built successfully");
     }
 
     /**
@@ -305,16 +290,11 @@ class AutomationFarm {
      * @brief The main Farming loop
      */
     static __farmLoop() {
-        const colburNonsenseEnabled = Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled);
+        const colburNonsenseEnabled = Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled) === "true";
         const featureEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.FeatureEnabled) === "true";
-
-        console.log("🔄 Farm Loop: Starting iteration");
-        console.log(`📊 Farm Loop: Feature enabled: ${featureEnabled}, Colbur Nonsense enabled: ${colburNonsenseEnabled}`);
-        console.log(`📊 Farm Loop: Desired layout: ${this.__desiredLayout}`);
 
         // If Colbur Nonsense is enabled, ONLY run Colbur Nonsense logic
         if (colburNonsenseEnabled) {
-            console.log("🔄 Colbur Nonsense: Running maintenance loop");
             this.__maintainColburNonsense();
             return;
         }
@@ -451,11 +431,8 @@ class AutomationFarm {
     static __maintainColburNonsense() {
         const layout = this.__desiredLayout;
         if (!layout) {
-            console.log("❌ Colbur Nonsense: Layout is null, cannot maintain");
             return;
         }
-
-        console.log("🔄 Colbur Nonsense: Starting maintenance with layout:", layout);
 
         let actionsPerformed = 0;
 
@@ -489,11 +466,6 @@ class AutomationFarm {
             adjustedTimes.colbur = 16800;  // 4:40:00 (19200 - 2400)
         }
 
-        console.log(`📊 Colbur Nonsense: Planting times (Mulch: ${hasMulch}, Sprayduck: ${hasSprayduck}):`);
-        console.log(`  Babiri: ${adjustedTimes.babiri}s`);
-        console.log(`  Payapa: ${adjustedTimes.payapa}s`);
-        console.log(`  Colbur: ${adjustedTimes.colbur}s`);
-
         // Check if Petaya has been planted (reference time)
         const petayaPlot = App.game.farming.plotList[1];
         const petayaPlanted = !petayaPlot.isEmpty() && petayaPlot.berry === BerryType.Petaya;
@@ -502,13 +474,7 @@ class AutomationFarm {
         if (petayaPlanted) {
             // Get Petaya planting time (approximate based on age)
             const petayaAge = petayaPlot.age;
-            const petayaGrowthTime = App.game.farming.berryData[BerryType.Petaya].growthTime[PlotStage.Berry];
             timeSincePetayaPlanted = petayaAge;
-
-            console.log(`📊 Colbur Nonsense: Petaya age: ${petayaAge}s, growth time: ${petayaGrowthTime}s`);
-        }
-        else {
-            console.log("⏳ Colbur Nonsense: Petaya not planted yet, planting Cheri immediately");
         }
 
         // Process each plot
@@ -527,29 +493,20 @@ class AutomationFarm {
             if (index === 0) {
                 // If Babiri is ripe, harvest it and replant
                 if (!isEmpty && currentBerry === BerryType.Babiri && stage === PlotStage.Berry) {
-                    console.log(`🌾 Colbur Nonsense: Harvesting ripe Babiri at plot ${index}`);
                     App.game.farming.harvest(index);
                     actionsPerformed++;
 
                     // Replant Babiri
                     if (App.game.farming.hasBerry(BerryType.Babiri)) {
-                        console.log(`🌱 Colbur Nonsense: Replanting Babiri at plot ${index}`);
                         App.game.farming.plant(index, BerryType.Babiri);
                         actionsPerformed++;
-                    }
-                    else {
-                        console.log(`⚠️ Colbur Nonsense: Cannot replant Babiri at plot ${index} - not enough berries`);
                     }
                 }
                 // If plot is empty, plant Babiri
                 else if (isEmpty) {
                     if (App.game.farming.hasBerry(BerryType.Babiri)) {
-                        console.log(`🌱 Colbur Nonsense: Planting Babiri at plot ${index}`);
                         App.game.farming.plant(index, BerryType.Babiri);
                         actionsPerformed++;
-                    }
-                    else {
-                        console.log(`⚠️ Colbur Nonsense: Cannot plant Babiri at plot ${index} - not enough berries`);
                     }
                 }
             }
@@ -559,7 +516,6 @@ class AutomationFarm {
 
                 if (isEmpty && desiredBerry === BerryType.Colbur) {
                     if (shouldPlantNow && App.game.farming.hasBerry(BerryType.Colbur)) {
-                        console.log(`🌱 Colbur Nonsense: Planting Colbur at plot ${index} (timing: ${timeSincePetayaPlanted}s >= ${adjustedTimes.colbur}s)`);
                         App.game.farming.plant(index, BerryType.Colbur);
                         actionsPerformed++;
                     }
@@ -569,21 +525,42 @@ class AutomationFarm {
                 }
                 else if (!isEmpty && currentBerry === BerryType.Colbur) {
                     if (stage === PlotStage.Berry) {
-                        console.log(`🌾 Colbur Nonsense: Harvesting ripe Colbur at plot ${index} for Farm Points`);
                         App.game.farming.harvest(index);
                         actionsPerformed++;
 
                         // Replant Cheri so Colbur can overtake it again
                         if (App.game.farming.hasBerry(BerryType.Cheri)) {
-                            console.log(`🌱 Colbur Nonsense: Replanting Cheri at plot ${index} (Colbur will overtake)`);
                             App.game.farming.plant(index, BerryType.Cheri);
                             actionsPerformed++;
                         }
                     }
                 }
-                // If Cheri is growing, just wait
-                else if (!isEmpty && currentBerry === BerryType.Cheri) {
-                    console.log(`⏳ Colbur Nonsense: Cheri growing at plot ${index}, waiting for Colbur to overtake`);
+                // If wrong berry is blocking, shovel it only if we need to plant now
+                else if (!isEmpty && currentBerry !== BerryType.Colbur && currentBerry !== BerryType.Cheri) {
+                    if (shouldPlantNow && App.game.farming.hasBerry(BerryType.Colbur)) {
+                        if (stage === PlotStage.Berry) {
+                            App.game.farming.harvest(index);
+                            actionsPerformed++;
+                        }
+                        else {
+                            // Check if current berry will finish before we need to plant
+                            const timeUntilCurrentBerryDone = FarmPlotManager.getTimeUntilStage(plot, PlotStage.Berry, overallGrowthMultiplier);
+                            const timeUntilNeedToPlant = adjustedTimes.colbur - timeSincePetayaPlanted;
+
+                            if (timeUntilNeedToPlant > timeUntilCurrentBerryDone) {
+                                // Wait for current berry to finish
+                                pass;
+                            }
+                            else {
+                                App.game.farming.shovel(index);
+                                actionsPerformed++;
+
+                                // Plant Colbur
+                                App.game.farming.plant(index, BerryType.Colbur);
+                                actionsPerformed++;
+                            }
+                        }
+                    }
                 }
             }
             // Handle Payapa plots (index 5, 6)
@@ -592,22 +569,19 @@ class AutomationFarm {
 
                 if (isEmpty && desiredBerry === BerryType.Payapa) {
                     if (shouldPlantNow && App.game.farming.hasBerry(BerryType.Payapa)) {
-                        console.log(`🌱 Colbur Nonsense: Planting Payapa at plot ${index} (timing: ${timeSincePetayaPlanted}s >= ${adjustedTimes.payapa}s)`);
                         App.game.farming.plant(index, BerryType.Payapa);
                         actionsPerformed++;
                     }
                     else if (!shouldPlantNow) {
-                        console.log(`⏳ Colbur Nonsense: Waiting to plant Payapa at plot ${index} (${timeSincePetayaPlanted}s / ${adjustedTimes.payapa}s)`);
+                        pass;
                     }
                 }
                 else if (!isEmpty && currentBerry === BerryType.Payapa) {
                     if (stage === PlotStage.Berry) {
-                        console.log(`🌾 Colbur Nonsense: Harvesting ripe Payapa at plot ${index}`);
                         App.game.farming.harvest(index);
                         actionsPerformed++;
 
                         if (App.game.farming.hasBerry(BerryType.Payapa)) {
-                            console.log(`🌱 Colbur Nonsense: Replanting Payapa at plot ${index}`);
                             App.game.farming.plant(index, BerryType.Payapa);
                             actionsPerformed++;
                         }
@@ -618,12 +592,10 @@ class AutomationFarm {
             else if (index === 1) {
                 if (!isEmpty && currentBerry === BerryType.Petaya) {
                     if (stage === PlotStage.Berry) {
-                        console.log(`🌾 Colbur Nonsense: Harvesting ripe Petaya at plot ${index}`);
                         App.game.farming.harvest(index);
                         actionsPerformed++;
 
                         if (App.game.farming.hasBerry(BerryType.Petaya)) {
-                            console.log(`🌱 Colbur Nonsense: Replanting Petaya at plot ${index}`);
                             App.game.farming.plant(index, BerryType.Petaya);
                             actionsPerformed++;
                         }
@@ -632,12 +604,8 @@ class AutomationFarm {
                 // If plot is empty, plant Petaya
                 else if (isEmpty) {
                     if (App.game.farming.hasBerry(BerryType.Petaya)) {
-                        console.log(`🌱 Colbur Nonsense: Planting Petaya at plot ${index}`);
                         App.game.farming.plant(index, BerryType.Petaya);
                         actionsPerformed++;
-                    }
-                    else {
-                        console.log(`⚠️ Colbur Nonsense: Cannot plant Petaya at plot ${index} - not enough berries`);
                     }
                 }
             }
@@ -646,23 +614,17 @@ class AutomationFarm {
                 // If plot is empty, plant Cheri
                 if (isEmpty) {
                     if (App.game.farming.hasBerry(BerryType.Cheri)) {
-                        console.log(`🌱 Colbur Nonsense: Planting Cheri at plot ${index}`);
                         App.game.farming.plant(index, BerryType.Cheri);
                         actionsPerformed++;
-                    }
-                    else {
-                        console.log(`⚠️ Colbur Nonsense: Cannot plant Cheri at plot ${index} - not enough berries`);
                     }
                 }
                 // If Cheri is ripe (Berry stage), harvest it immediately and replant
                 else if (!isEmpty && currentBerry === BerryType.Cheri && stage === PlotStage.Berry) {
-                    console.log(`🌾 Colbur Nonsense: Harvesting Cheri ASAP at plot ${index}`);
                     App.game.farming.harvest(index);
                     actionsPerformed++;
 
                     // Replant Cheri immediately
                     if (App.game.farming.hasBerry(BerryType.Cheri)) {
-                        console.log(`🌱 Colbur Nonsense: Replanting Cheri at plot ${index}`);
                         App.game.farming.plant(index, BerryType.Cheri);
                         actionsPerformed++;
                     }
@@ -674,19 +636,16 @@ class AutomationFarm {
                 // If wrong berry is planted, remove it and plant Cheri
                 else if (!isEmpty && currentBerry !== BerryType.Cheri) {
                     if (stage === PlotStage.Berry) {
-                        console.log(`🌾 Colbur Nonsense: Harvesting wrong berry ${BerryType[currentBerry]} at plot ${index} (want Cheri)`);
                         App.game.farming.harvest(index);
                         actionsPerformed++;
                     }
                     else {
-                        console.log(`🔧 Colbur Nonsense: Shoveling wrong berry ${BerryType[currentBerry]} at plot ${index} (want Cheri)`);
                         App.game.farming.shovel(index);
                         actionsPerformed++;
                     }
 
                     // Plant Cheri
                     if (App.game.farming.hasBerry(BerryType.Cheri)) {
-                        console.log(`🌱 Colbur Nonsense: Planting Cheri at plot ${index}`);
                         App.game.farming.plant(index, BerryType.Cheri);
                         actionsPerformed++;
                     }
@@ -697,19 +656,16 @@ class AutomationFarm {
                 // If plot has a berry, harvest or shovel it
                 if (!isEmpty) {
                     if (stage === PlotStage.Berry) {
-                        console.log(`🌾 Colbur Nonsense: Harvesting berry ${BerryType[currentBerry]} at plot ${index} (want empty)`);
                         App.game.farming.harvest(index);
                         actionsPerformed++;
                     }
                     else {
-                        console.log(`🔧 Colbur Nonsense: Shoveling berry ${BerryType[currentBerry]} at plot ${index} (want empty)`);
                         App.game.farming.shovel(index);
                         actionsPerformed++;
                     }
                 }
                 // Optionally plant Cheri in empty plots for more Colbur opportunities
                 else if (isEmpty && App.game.farming.hasBerry(BerryType.Cheri)) {
-                    console.log(`🌱 Colbur Nonsense: Planting Cheri at plot ${index} (optional for Colbur)`);
                     App.game.farming.plant(index, BerryType.Cheri);
                     actionsPerformed++;
                 }
@@ -717,25 +673,20 @@ class AutomationFarm {
             // If wrong berry, remove it and plant correct one
             else if (!isEmpty && currentBerry !== desiredBerry) {
                 if (stage === PlotStage.Berry) {
-                    console.log(`🌾 Colbur Nonsense: Harvesting wrong berry ${BerryType[currentBerry]} at plot ${index} (want ${BerryType[desiredBerry]})`);
                     App.game.farming.harvest(index);
                     actionsPerformed++;
                 }
                 else {
-                    console.log(`🔧 Colbur Nonsense: Shoveling wrong berry ${BerryType[currentBerry]} at plot ${index} (want ${BerryType[desiredBerry]})`);
                     App.game.farming.shovel(index);
                     actionsPerformed++;
                 }
 
                 if (desiredBerry !== 0 && App.game.farming.hasBerry(desiredBerry)) {
-                    console.log(`🌱 Colbur Nonsense: Planting ${BerryType[desiredBerry]} at plot ${index}`);
                     App.game.farming.plant(index, desiredBerry);
                     actionsPerformed++;
                 }
             }
         });
-
-        console.log(`✅ Colbur Nonsense: Maintenance complete - ${actionsPerformed} actions performed`);
     }
 
     /**
@@ -832,11 +783,6 @@ class AutomationFarm {
         // Sort by growth time (longest first - these should be planted first)
         berryGrowthTimes.sort((a, b) => b.growthTime - a.growthTime);
 
-        console.log("📊 Colbur Nonsense: Planting order (longest growth time first):");
-        berryGrowthTimes.forEach((item, index) => {
-            console.log(`  ${index + 1}. ${BerryType[item.berryType]}: ${item.growthTime}s`);
-        });
-
         return berryGrowthTimes;
     }
 
@@ -865,18 +811,12 @@ class AutomationFarm {
             // Find all plots that should have this berry
             const plotIndexes = layout.map((berry, index) => berry === berryType ? index : -1).filter(index => index !== -1);
 
-            console.log(`🌱 Colbur Nonsense: Planting ${BerryType[berryType]} (growth time: ${growthTime}s, offset: ${timeOffset}s)`);
-
             // Plant in all designated plots
             plotIndexes.forEach(index => {
                 const plot = App.game.farming.plotList[index];
                 if (plot.isUnlocked && !plot.isSafeLocked && plot.isEmpty()) {
                     if (App.game.farming.hasBerry(berryType)) {
                         App.game.farming.plant(index, berryType);
-                        console.log(`  ✅ Planted at plot ${index}`);
-                    }
-                    else {
-                        console.log(`  ⚠️ Cannot plant at plot ${index} - not enough berries`);
                     }
                 }
             });
