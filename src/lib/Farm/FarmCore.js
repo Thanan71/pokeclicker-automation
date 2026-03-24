@@ -419,11 +419,11 @@ class AutomationFarm {
      * Cheri   Colbur  Cheri  Colbur Cheri
      * Cheri   Cheri   Cheri  Cheri  Cheri
      *
-     * - Index 0: Babiri (50) - protects Petaya
-     * - Index 1: Petaya (64) - reference time for planting
-     * - Index 5,6: Payapa (45) - Mutation Chance up aura
+     * - Index 0: Babiri (50) - protects Petaya, plant immediately when empty
+     * - Index 1: Petaya (64) - reference time for planting, plant immediately when empty
+     * - Index 2,3,4,7,9,10,11,12,13,14,15,17,19,20,21,22,23,24: Cheri (1) - plant immediately when empty, harvest and replant when ripe
+     * - Index 5,6: Payapa (45) - Mutation Chance up aura, plant at correct timing
      * - Index 8,16,18: Colbur (51) - harvest when ripe, replant Cheri (Colbur will overtake Cheri again)
-     * - Others: Cheri (1) - for Colbur to overtake
      *
      * Strategy: Colbur is a Parasite Berry that overtakes Cheri.
      * Harvest Colbur when ripe, then replant Cheri. Colbur will overtake Cheri again.
@@ -434,6 +434,7 @@ class AutomationFarm {
      * - Babiri: 18:00:00 after Petaya (or 11:59:56 with Mulch/Sprayduck, or 07:59:54 with both)
      * - Payapa: 09:30:00 after Petaya (or 06:19:58 with Mulch/Sprayduck, or 04:13:17 with both)
      * - Colbur: 07:30:00 after Petaya (or 04:59:58 with Mulch/Sprayduck, or 03:19:58 with both)
+     * - Cheri: Plant immediately when empty, harvest and replant when ripe
      */
     static __maintainColburNonsense() {
         const layout = this.__desiredLayout;
@@ -614,6 +615,44 @@ class AutomationFarm {
                             App.game.farming.plant(index, BerryType.Petaya);
                             actionsPerformed++;
                         }
+                    }
+                }
+                // If plot is empty, plant Petaya
+                else if (isEmpty) {
+                    if (App.game.farming.hasBerry(BerryType.Petaya)) {
+                        console.log(`🌱 Colbur Nonsense: Planting Petaya at plot ${index}`);
+                        App.game.farming.plant(index, BerryType.Petaya);
+                        actionsPerformed++;
+                    }
+                    else {
+                        console.log(`⚠️ Colbur Nonsense: Cannot plant Petaya at plot ${index} - not enough berries`);
+                    }
+                }
+            }
+            // Handle Cheri plots (indices 2,3,4,7,9,10,11,12,13,14,15,17,19,20,21,22,23,24)
+            else if (desiredBerry === BerryType.Cheri) {
+                // If plot is empty, plant Cheri
+                if (isEmpty) {
+                    if (App.game.farming.hasBerry(BerryType.Cheri)) {
+                        console.log(`🌱 Colbur Nonsense: Planting Cheri at plot ${index}`);
+                        App.game.farming.plant(index, BerryType.Cheri);
+                        actionsPerformed++;
+                    }
+                    else {
+                        console.log(`⚠️ Colbur Nonsense: Cannot plant Cheri at plot ${index} - not enough berries`);
+                    }
+                }
+                // If Cheri is ripe, harvest it and replant
+                else if (!isEmpty && currentBerry === BerryType.Cheri && stage === PlotStage.Berry) {
+                    console.log(`🌾 Colbur Nonsense: Harvesting ripe Cheri at plot ${index}`);
+                    App.game.farming.harvest(index);
+                    actionsPerformed++;
+
+                    // Replant Cheri
+                    if (App.game.farming.hasBerry(BerryType.Cheri)) {
+                        console.log(`🌱 Colbur Nonsense: Replanting Cheri at plot ${index}`);
+                        App.game.farming.plant(index, BerryType.Cheri);
+                        actionsPerformed++;
                     }
                 }
             }
