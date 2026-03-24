@@ -1,6 +1,5 @@
 /**
  * @class FarmMenuBuilder handles all menu construction for the Farm automation
- * Follows Single Responsibility Principle - only handles UI/menu building
  */
 class FarmMenuBuilder
 {
@@ -116,61 +115,6 @@ class FarmMenuBuilder
     }
 
     /**
-     * @brief Builds the advanced farming features section
-     *
-     * @param {Element} parentPanel: The parent panel to add features to
-     * @param {Object} settings: The settings object
-     */
-    static buildAdvancedFarmingFeatures(parentPanel, settings)
-    {
-        // === ADVANCED FARMING FEATURES ===
-        const advancedTitleDiv = Automation.Menu.createTitleElement("🌾 Advanced Farming Intelligence");
-        advancedTitleDiv.style.marginTop = "15px";
-        advancedTitleDiv.style.marginBottom = "10px";
-        parentPanel.appendChild(advancedTitleDiv);
-
-        // Auto-optimize berries button
-        const autoOptimizeTooltip = "Automatically selects the best berry to plant based on Farm Points per minute.\n"
-            + "Calculates optimal berry using: harvest amount, growth time, and FP value.";
-        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Auto-optimize berry selection",
-            settings.AutoOptimizeBerries,
-            autoOptimizeTooltip,
-            parentPanel);
-
-        // Auto-mutations button
-        const autoMutationsTooltip = "Automatically plants berries in optimal patterns to trigger mutations.\n"
-            + "Prioritizes rare berries and maximizes mutation success rate.";
-        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Auto-mutations enabled",
-            settings.AutoMutations,
-            autoMutationsTooltip,
-            parentPanel);
-
-        // Maximize Farm Points button
-        const maximizeFPTooltip = "Focuses on maximizing Farm Points generation.\n"
-            + "Calculates exact FP/min for each berry and chooses the most profitable.";
-        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Maximize Farm Points",
-            settings.MaximizeFarmPoints,
-            maximizeFPTooltip,
-            parentPanel);
-
-        // Smart plot management button
-        const smartPlotTooltip = "Intelligently manages all plots in real-time.\n"
-            + "Monitors plot states, handles locked plots, and optimizes layout.";
-        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Smart plot management",
-            settings.SmartPlotManagement,
-            smartPlotTooltip,
-            parentPanel);
-
-        // Optimal timing button
-        const optimalTimingTooltip = "Harvests berries at the perfect moment for maximum yield.\n"
-            + "Synchronizes rich mulch application and handles mutation timing.";
-        Automation.Menu.addLabeledAdvancedSettingsToggleButton("Optimal harvest timing",
-            settings.OptimalTiming,
-            optimalTimingTooltip,
-            parentPanel);
-    }
-
-    /**
      * @brief Builds the Colbur Nonsense mode toggle
      *
      * @param {Element} parentPanel: The parent panel
@@ -215,10 +159,4 @@ class FarmMenuBuilder
             contentFloatingContentContainer
         };
     }
-}
-
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports)
-{
-    module.exports = FarmMenuBuilder;
 }

@@ -1,58 +1,8 @@
 /**
  * @class FarmPlotManager handles plot state tracking and management
- * Follows Single Responsibility Principle - only handles plot-related operations
  */
 class FarmPlotManager
 {
-    // Plot state tracking
-    static __plotStates = [];
-    static __lastPlotScan = 0;
-    static PLOT_SCAN_INTERVAL = 5000; // 5 seconds
-
-    /**
-     * @brief Scans and updates plot states for smart management
-     */
-    static scanPlotStates()
-    {
-        const now = Date.now();
-        if ((now - this.__lastPlotScan) < this.PLOT_SCAN_INTERVAL)
-        {
-            return; // Only scan every 5 seconds
-        }
-
-        this.__plotStates = [];
-        this.__lastPlotScan = now;
-
-        for (const [index, plot] of App.game.farming.plotList.entries())
-        {
-            const state = {
-                index: index,
-                isUnlocked: plot.isUnlocked,
-                isEmpty: plot.isEmpty(),
-                berry: plot.berry,
-                stage: plot.stage(),
-                age: plot.age,
-                isSafeLocked: plot.isSafeLocked,
-                hasWanderer: plot.wanderer !== null,
-                mulch: plot.mulch,
-                timeUntilRipe: plot.isEmpty() ? 0 : this.getTimeUntilStage(plot, PlotStage.Berry),
-                timeUntilWither: plot.isEmpty() ? 0 : this.getTimeUntilStage(plot, PlotStage.Berry) +
-                    (plot.berryData?.growthTime[PlotStage.Berry] || 0) - plot.age
-            };
-            this.__plotStates.push(state);
-        }
-    }
-
-    /**
-     * @brief Gets the current plot states
-     *
-     * @returns Array of plot state objects
-     */
-    static getPlotStates()
-    {
-        return this.__plotStates;
-    }
-
     /**
      * @brief Gets the time until a plot gets past a specific stage
      *
@@ -284,10 +234,4 @@ class FarmPlotManager
             App.game.farming.handleWanderer(plot);
         }
     }
-}
-
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports)
-{
-    module.exports = FarmPlotManager;
 }

@@ -1,6 +1,5 @@
 /**
  * @class AutomationFarm is the main class that coordinates all Farm automation modules
- * Follows Dependency Inversion Principle - depends on abstractions (other modules) not implementations
  *
  * @note The farm is not accessible right away when starting a new game.
  *       This menu will be hidden until the functionality is unlocked in-game.
@@ -16,13 +15,7 @@ class AutomationFarm
         OakItemLoadoutUpdate: "Farming-OakItemLoadoutUpdate",
         SelectedBerryToPlant: "Farming-SelectedBerryToPlant",
         UseRichMulch: "Farming-UseRichMulch",
-        UseShovel: "Farming-UseShovel",
-        // Advanced settings
-        AutoOptimizeBerries: "Farming-AutoOptimizeBerries",
-        AutoMutations: "Farming-AutoMutations",
-        MaximizeFarmPoints: "Farming-MaximizeFarmPoints",
-        SmartPlotManagement: "Farming-SmartPlotManagement",
-        OptimalTiming: "Farming-OptimalTiming"
+        UseShovel: "Farming-UseShovel"
     };
 
     // The berry type forced to plant by other features
@@ -33,12 +26,10 @@ class AutomationFarm
     static __contentFloatingContainer = null;
     static __contentFloatingContentContainer = null;
     static __berriesDropdownList = null;
-    static __farmInGameModal = null;
     static __lockedBerries = [];
     static __farmingLoop = null;
     static __currentStrategy = null;
     static __lastFarmingBerryType = null;
-    static __floatingPanelStateData = null;
     static __harvestCount = 0;
     static __freeSlotCount = 0;
     static __plantedBerryCount = 0;
@@ -60,11 +51,6 @@ class AutomationFarm
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.UseShovel, false);
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.SelectedBerryToPlant, BerryType.Cheri);
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.ColburNonsenseEnabled, false);
-            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.AutoOptimizeBerries, true);
-            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.AutoMutations, true);
-            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.MaximizeFarmPoints, true);
-            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.SmartPlotManagement, true);
-            Automation.Utils.LocalStorage.setDefaultValue(this.Settings.OptimalTiming, true);
 
             this.__buildMenu();
         }
@@ -130,7 +116,6 @@ class AutomationFarm
             Automation.Utils.LocalStorage.setValue(this.Settings.UseShovel, true);
             Automation.Utils.LocalStorage.setValue(this.Settings.HarvestLate, true);
             this.__desiredLayout = [51, 64, 0, 0, 0, 45, 45, 0, 50, 0, 0, 0, 0, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 0, 0];
-            console.log("✅ Mode Colbur Nonsense activé - layout chargé");
         }
         else
         {
@@ -179,9 +164,6 @@ class AutomationFarm
             }
         );
 
-        // Build advanced farming features
-        FarmMenuBuilder.buildAdvancedFarmingFeatures(farmingSettingPanel, this.Settings);
-
         // Build berry dropdown list
         this.__buildBerryDropdownList(farmingSettingPanel);
 
@@ -198,11 +180,6 @@ class AutomationFarm
     {
         const disableReason = "This settings is not considered when the\n"
             + "'Focus on unlocking plots and new berries' setting is enabled";
-
-        if (Automation.Utils.LocalStorage.getValue(this.Settings.FocusOnUnlocks) === "true")
-        {
-            Automation.Menu.setButtonDisabledState(this.Settings.HarvestLate, true, disableReason);
-        }
 
         const disableState = (Automation.Utils.LocalStorage.getValue(this.Settings.FocusOnUnlocks) === "true");
         Automation.Menu.setButtonDisabledState(this.Settings.HarvestLate, disableState, disableReason);
@@ -323,8 +300,12 @@ class AutomationFarm
             return;
         }
 
-        // Run enhanced farming features first (only if Colbur Nonsense is NOT enabled)
-        this.__enhancedFarmLoop();
+        // Catch wanderers
+        const autoCatchEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.AutoCatchWanderers) === "true";
+        FarmPlotManager.catchWanderingPokemons(autoCatchEnabled);
+
+        // Try to unlock new spots
+        FarmPlotManager.tryToUnlockNewSpots();
 
         // Run normal harvest logic
         this.__harvestAsEfficientAsPossible();
@@ -352,9 +333,8 @@ class AutomationFarm
         this.__updateFloatingPanel();
 
         // Otherwise, fallback to planting berries
-        const autoOptimizeEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.AutoOptimizeBerries) === "true";
         const selectedBerryType = parseInt(Automation.Utils.LocalStorage.getValue(this.Settings.SelectedBerryToPlant));
-        const berryToPlant = this.ForcePlantBerriesAsked ?? FarmBerryOptimizer.getBestBerryToPlant(autoOptimizeEnabled, selectedBerryType);
+        const berryToPlant = this.ForcePlantBerriesAsked ?? selectedBerryType;
 
         // Remove any unwanted berry, if enabled
         if (Automation.Utils.LocalStorage.getValue(this.Settings.UseShovel) === "true")
@@ -377,119 +357,6 @@ class AutomationFarm
         if (this.__currentStrategy !== null)
         {
             this.__currentStrategy = null;
-        }
-    }
-
-    /**
-     * @brief Enhanced farm loop with all advanced features
-     */
-    static __enhancedFarmLoop()
-    {
-        // Run continuous adaptation
-        this.__continuousAdaptation();
-
-        // Run smart plot management
-        if (Automation.Utils.LocalStorage.getValue(this.Settings.SmartPlotManagement) === "true")
-        {
-            FarmPlotManager.scanPlotStates();
-        }
-
-        // Run optimal timing harvest
-        if (Automation.Utils.LocalStorage.getValue(this.Settings.OptimalTiming) === "true")
-        {
-            this.__optimalTimingHarvest();
-        }
-
-        // Run auto-mutations
-        if (Automation.Utils.LocalStorage.getValue(this.Settings.AutoMutations) === "true")
-        {
-            this.__handleAutoMutations();
-        }
-
-        // Update FP optimization
-        const maximizeFpEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.MaximizeFarmPoints) === "true";
-        FarmBerryOptimizer.updateFpOptimization(maximizeFpEnabled);
-
-        // Catch wanderers
-        const autoCatchEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.AutoCatchWanderers) === "true";
-        FarmPlotManager.catchWanderingPokemons(autoCatchEnabled);
-    }
-
-    /**
-     * @brief Performs continuous adaptation based on game state
-     */
-    static __continuousAdaptation()
-    {
-        FarmPlotManager.tryToUnlockNewSpots();
-
-        if (FarmBerryOptimizer.shouldRefreshCache())
-        {
-            FarmBerryOptimizer.clearCache();
-        }
-    }
-
-    /**
-     * @brief Performs optimal timing for harvesting
-     */
-    static __optimalTimingHarvest()
-    {
-        // Skip optimal timing harvest if Colbur Nonsense is enabled
-        const colburNonsenseEnabled = Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled);
-        if (colburNonsenseEnabled)
-        {
-            return;
-        }
-
-        FarmPlotManager.scanPlotStates();
-
-        const richMulchEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.UseRichMulch) === "true";
-        const harvestLateEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.HarvestLate) === "true";
-
-        for (const plotState of FarmPlotManager.getPlotStates())
-        {
-            if (!plotState.isUnlocked || plotState.isEmpty || plotState.isSafeLocked)
-            {
-                continue;
-            }
-
-            if (plotState.stage !== PlotStage.Berry)
-            {
-                continue;
-            }
-
-            let shouldHarvest = false;
-
-            if (harvestLateEnabled)
-            {
-                shouldHarvest = plotState.timeUntilWither < 30000;
-            }
-            else
-            {
-                shouldHarvest = true;
-            }
-
-            if (shouldHarvest)
-            {
-                FarmPlotManager.mulchAndHarvest(plotState.index, richMulchEnabled);
-                this.__harvestCount++;
-                this.__freeSlotCount++;
-            }
-        }
-    }
-
-    /**
-     * @brief Detects and handles auto-mutations
-     */
-    static __handleAutoMutations()
-    {
-        for (const mutation of App.game.farming.mutations)
-        {
-            if (!mutation.unlocked)
-            {
-                continue;
-            }
-
-            // Simple mutation handling - can be expanded
         }
     }
 
@@ -561,11 +428,8 @@ class AutomationFarm
         const layout = this.__desiredLayout;
         if (!layout)
         {
-            console.log("❌ Colbur Nonsense: Layout is null");
             return;
         }
-
-        console.log("🔄 Colbur Nonsense: Maintaining layout");
 
         App.game.farming.plotList.forEach((plot, index) =>
         {
@@ -576,12 +440,10 @@ class AutomationFarm
             // If plot has a berry but we want it empty
             if (!isEmpty && desiredBerry === 0)
             {
-                // If berry is fully grown, harvest it
                 if (plot.stage() === PlotStage.Berry)
                 {
                     App.game.farming.harvest(index);
                 }
-                // If berry is not fully grown, use shovel to remove it
                 else
                 {
                     App.game.farming.shovel(index);
@@ -592,31 +454,22 @@ class AutomationFarm
             {
                 if (App.game.farming.hasBerry(desiredBerry))
                 {
-                    console.log(`🌱 Colbur Nonsense: Planting berry ${desiredBerry} at index ${index}`);
                     App.game.farming.plant(index, desiredBerry);
-                }
-                else
-                {
-                    console.log(`❌ Colbur Nonsense: Don't have berry ${desiredBerry} to plant at index ${index}`);
                 }
             }
             // If plot has a different berry than desired, replace it
             else if (!isEmpty && currentBerry !== desiredBerry)
             {
-                // If berry is fully grown, harvest it
                 if (plot.stage() === PlotStage.Berry)
                 {
                     App.game.farming.harvest(index);
                 }
-                // If berry is not fully grown, use shovel to remove it
                 else
                 {
                     App.game.farming.shovel(index);
                 }
-                // Plant the desired berry if we want one there
                 if (desiredBerry !== 0 && App.game.farming.hasBerry(desiredBerry))
                 {
-                    console.log(`🌱 Colbur Nonsense: Planting berry ${desiredBerry} at index ${index}`);
                     App.game.farming.plant(index, desiredBerry);
                 }
             }
@@ -624,7 +477,6 @@ class AutomationFarm
             else if (!isEmpty && plot.stage() === PlotStage.Berry && currentBerry === 51)
             {
                 App.game.farming.harvest(index);
-                // Don't plant anything - keep the plot empty
             }
         });
     }
@@ -638,8 +490,6 @@ class AutomationFarm
         {
             return;
         }
-
-        this.__floatingPanelStateData = null;
 
         if (this.__currentStrategy)
         {
