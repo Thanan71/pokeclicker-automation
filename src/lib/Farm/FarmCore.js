@@ -447,15 +447,6 @@ class AutomationFarm {
 
         let actionsPerformed = 0;
 
-        // Check if Petaya has been planted (reference time)
-        const petayaPlot = App.game.farming.plotList[1];
-        const petayaPlanted = !petayaPlot.isEmpty() && petayaPlot.berry === BerryType.Petaya;
-
-        if (!petayaPlanted) {
-            console.log("⏳ Colbur Nonsense: Waiting for Petaya to be planted first");
-            return;
-        }
-
         // Calculate planting times based on growth multipliers
         const hasMulch = Automation.Utils.LocalStorage.getValue(this.Settings.UseRichMulch) === "true";
         const hasSprayduck = App.game.oakItems.itemList[OakItemType.Sprayduck]?.isActive ?? false;
@@ -469,7 +460,6 @@ class AutomationFarm {
             colbur: 25200   // 7:00:00 (28800 - 3600)
         };
 
-        // Adjusted times based on multipliers
         let adjustedTimes = { ...baseTimes };
 
         if (hasMulch && hasSprayduck) {
@@ -492,12 +482,22 @@ class AutomationFarm {
         console.log(`  Payapa: ${adjustedTimes.payapa}s`);
         console.log(`  Colbur: ${adjustedTimes.colbur}s`);
 
-        // Get Petaya planting time (approximate based on age)
-        const petayaAge = petayaPlot.age;
-        const petayaGrowthTime = App.game.farming.berryData[BerryType.Petaya].growthTime[PlotStage.Berry];
-        const timeSincePetayaPlanted = petayaAge;
+        // Check if Petaya has been planted (reference time)
+        const petayaPlot = App.game.farming.plotList[1];
+        const petayaPlanted = !petayaPlot.isEmpty() && petayaPlot.berry === BerryType.Petaya;
+        let timeSincePetayaPlanted = 0;
 
-        console.log(`📊 Colbur Nonsense: Petaya age: ${petayaAge}s, growth time: ${petayaGrowthTime}s`);
+        if (petayaPlanted) {
+            // Get Petaya planting time (approximate based on age)
+            const petayaAge = petayaPlot.age;
+            const petayaGrowthTime = App.game.farming.berryData[BerryType.Petaya].growthTime[PlotStage.Berry];
+            timeSincePetayaPlanted = petayaAge;
+
+            console.log(`📊 Colbur Nonsense: Petaya age: ${petayaAge}s, growth time: ${petayaGrowthTime}s`);
+        }
+        else {
+            console.log("⏳ Colbur Nonsense: Petaya not planted yet, planting Cheri immediately");
+        }
 
         // Process each plot
         App.game.farming.plotList.forEach((plot, index) => {
@@ -651,6 +651,30 @@ class AutomationFarm {
                     // Replant Cheri
                     if (App.game.farming.hasBerry(BerryType.Cheri)) {
                         console.log(`🌱 Colbur Nonsense: Replanting Cheri at plot ${index}`);
+                        App.game.farming.plant(index, BerryType.Cheri);
+                        actionsPerformed++;
+                    }
+                }
+                // If Cheri is growing, just wait for it to ripen
+                else if (!isEmpty && currentBerry === BerryType.Cheri && stage !== PlotStage.Berry) {
+                    // Cheri is growing, wait for it to ripen
+                }
+                // If wrong berry is planted, remove it and plant Cheri
+                else if (!isEmpty && currentBerry !== BerryType.Cheri) {
+                    if (stage === PlotStage.Berry) {
+                        console.log(`🌾 Colbur Nonsense: Harvesting wrong berry ${BerryType[currentBerry]} at plot ${index} (want Cheri)`);
+                        App.game.farming.harvest(index);
+                        actionsPerformed++;
+                    }
+                    else {
+                        console.log(`🔧 Colbur Nonsense: Shoveling wrong berry ${BerryType[currentBerry]} at plot ${index} (want Cheri)`);
+                        App.game.farming.shovel(index);
+                        actionsPerformed++;
+                    }
+
+                    // Plant Cheri
+                    if (App.game.farming.hasBerry(BerryType.Cheri)) {
+                        console.log(`🌱 Colbur Nonsense: Planting Cheri at plot ${index}`);
                         App.game.farming.plant(index, BerryType.Cheri);
                         actionsPerformed++;
                     }
