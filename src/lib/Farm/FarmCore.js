@@ -60,9 +60,9 @@ class AutomationFarm {
                 this.__desiredLayout = [
                     50, 64, 0, 0, 0,   // Babiri, Petaya, Cheri, Cheri, Cheri
                     45, 45, 0, 51, 0,  // Payapa, Payapa, Cheri, Colbur, Cheri
-                    0,  0,  0,  0,  0, // Cheri x5
+                    0, 0, 0, 0, 0, // Cheri x5
                     0, 51, 0, 51, 0,   // Cheri, Colbur, Cheri, Colbur, Cheri
-                    0,  0,  0,  0,  0  // Cheri x5
+                    0, 0, 0, 0, 0  // Cheri x5
                 ];
             }
 
@@ -128,9 +128,9 @@ class AutomationFarm {
             this.__desiredLayout = [
                 50, 64, 0, 0, 0,   // Babiri, Petaya, Cheri, Cheri, Cheri
                 45, 45, 0, 51, 0,  // Payapa, Payapa, Cheri, Colbur, Cheri
-                0,  0,  0,  0,  0, // Cheri x5
+                0, 0, 0, 0, 0, // Cheri x5
                 0, 51, 0, 51, 0,   // Cheri, Colbur, Cheri, Colbur, Cheri
-                0,  0,  0,  0,  0  // Cheri x5
+                0, 0, 0, 0, 0  // Cheri x5
             ];
         }
         else {
@@ -549,7 +549,7 @@ class AutomationFarm {
 
                             if (timeUntilNeedToPlant > timeUntilCurrentBerryDone) {
                                 // Wait for current berry to finish
-                                pass;
+
                             }
                             else {
                                 App.game.farming.shovel(index);
@@ -572,9 +572,7 @@ class AutomationFarm {
                         App.game.farming.plant(index, BerryType.Payapa);
                         actionsPerformed++;
                     }
-                    else if (!shouldPlantNow) {
-                        pass;
-                    }
+
                 }
                 else if (!isEmpty && currentBerry === BerryType.Payapa) {
                     if (stage === PlotStage.Berry) {
