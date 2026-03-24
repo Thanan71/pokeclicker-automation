@@ -104,7 +104,7 @@ class AutomationFarm {
 
         if (enable) {
             if (this.__farmingLoop === null) {
-                this.__farmingLoop = setInterval(this.__farmLoop.bind(this), 10000);
+                this.__farmingLoop = setInterval(this.__farmLoop.bind(this), 1000);
                 this.__farmLoop();
             }
         }
