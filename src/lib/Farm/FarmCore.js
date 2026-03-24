@@ -654,13 +654,13 @@ class AutomationFarm {
                         console.log(`⚠️ Colbur Nonsense: Cannot plant Cheri at plot ${index} - not enough berries`);
                     }
                 }
-                // If Cheri is ripe, harvest it and replant
+                // If Cheri is ripe (Berry stage), harvest it immediately and replant
                 else if (!isEmpty && currentBerry === BerryType.Cheri && stage === PlotStage.Berry) {
-                    console.log(`🌾 Colbur Nonsense: Harvesting ripe Cheri at plot ${index}`);
+                    console.log(`🌾 Colbur Nonsense: Harvesting Cheri ASAP at plot ${index}`);
                     App.game.farming.harvest(index);
                     actionsPerformed++;
 
-                    // Replant Cheri
+                    // Replant Cheri immediately
                     if (App.game.farming.hasBerry(BerryType.Cheri)) {
                         console.log(`🌱 Colbur Nonsense: Replanting Cheri at plot ${index}`);
                         App.game.farming.plant(index, BerryType.Cheri);
