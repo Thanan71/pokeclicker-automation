@@ -548,11 +548,21 @@ class AutomationFarm
         {
             const desiredBerry = layout[index] ?? 0;
 
-            if (plot.berry !== desiredBerry && !plot.isEmpty())
+            // If plot is empty and we want a berry there, plant it
+            if (plot.isEmpty())
+            {
+                if (desiredBerry !== 0)
+                {
+                    App.game.farming.plant(index, desiredBerry);
+                }
+            }
+            // If plot has a different berry than desired, replace it
+            else if (plot.berry !== desiredBerry)
             {
                 App.game.farming.harvest(index);
                 App.game.farming.plant(index, desiredBerry);
             }
+            // Special case: harvest Colbur (51) when fully grown and replant empty
             else if (plot.stage() === PlotStage.Berry && plot.berry === 51)
             {
                 App.game.farming.harvest(index);
