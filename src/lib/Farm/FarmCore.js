@@ -52,6 +52,12 @@ class AutomationFarm
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.SelectedBerryToPlant, BerryType.Cheri);
             Automation.Utils.LocalStorage.setDefaultValue(this.Settings.ColburNonsenseEnabled, false);
 
+            // Load Colbur Nonsense layout if enabled
+            if (Automation.Utils.LocalStorage.getValue(this.Settings.ColburNonsenseEnabled) === "true")
+            {
+                this.__desiredLayout = [51, 64, 0, 0, 0, 45, 45, 0, 50, 0, 0, 0, 0, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 0, 0];
+            }
+
             this.__buildMenu();
         }
         else if (initStep == Automation.InitSteps.Finalize)
@@ -422,6 +428,12 @@ class AutomationFarm
 
     /**
      * @brief Maintains Colbur Nonsense layout
+     * Layout: [51, 64, 0, 0, 0, 45, 45, 0, 50, 0, 0, 0, 0, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 0, 0]
+     * - Index 0: Colbur (51) - harvest when ripe, replant
+     * - Index 1: Petaya (64)
+     * - Index 5,6: Payapa (45)
+     * - Index 8,15,17: Babiri (50)
+     * - Others: empty
      */
     static __maintainColburNonsense()
     {
@@ -437,7 +449,13 @@ class AutomationFarm
             const currentBerry = plot.berry;
             const isEmpty = plot.isEmpty();
 
-            // If plot has a berry but we want it empty
+            // Skip locked plots
+            if (!plot.isUnlocked || plot.isSafeLocked)
+            {
+                return;
+            }
+
+            // Case 1: Plot has a berry but we want it empty
             if (!isEmpty && desiredBerry === 0)
             {
                 if (plot.stage() === PlotStage.Berry)
@@ -449,7 +467,7 @@ class AutomationFarm
                     App.game.farming.shovel(index);
                 }
             }
-            // If plot is empty and we want a berry there, plant it
+            // Case 2: Plot is empty and we want a berry there
             else if (isEmpty && desiredBerry !== 0)
             {
                 if (App.game.farming.hasBerry(desiredBerry))
@@ -457,7 +475,7 @@ class AutomationFarm
                     App.game.farming.plant(index, desiredBerry);
                 }
             }
-            // If plot has a different berry than desired, replace it
+            // Case 3: Plot has a different berry than desired
             else if (!isEmpty && currentBerry !== desiredBerry)
             {
                 if (plot.stage() === PlotStage.Berry)
@@ -468,15 +486,21 @@ class AutomationFarm
                 {
                     App.game.farming.shovel(index);
                 }
+                // Plant the desired berry after clearing
                 if (desiredBerry !== 0 && App.game.farming.hasBerry(desiredBerry))
                 {
                     App.game.farming.plant(index, desiredBerry);
                 }
             }
-            // Special case: harvest Colbur (51) when fully grown and keep empty
-            else if (!isEmpty && plot.stage() === PlotStage.Berry && currentBerry === 51)
+            // Case 4: Plot has the correct berry and it's ripe - harvest and replant
+            else if (!isEmpty && currentBerry === desiredBerry && plot.stage() === PlotStage.Berry)
             {
                 App.game.farming.harvest(index);
+                // Replant the same berry after harvest
+                if (App.game.farming.hasBerry(desiredBerry))
+                {
+                    App.game.farming.plant(index, desiredBerry);
+                }
             }
         });
     }
