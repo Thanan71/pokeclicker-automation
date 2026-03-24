@@ -173,7 +173,10 @@ class AutomationFarm
         FarmMenuBuilder.buildColburNonsenseToggle(
             farmingSettingPanel,
             this.Settings,
-            () => this.toggleColburNonsense(Automation.Utils.LocalStorage.getValue(this.Settings.ColburNonsenseEnabled) === "true")
+            () => {
+                const currentState = Automation.Utils.LocalStorage.getValue(this.Settings.ColburNonsenseEnabled) === "true";
+                this.toggleColburNonsense(!currentState);
+            }
         );
 
         // Build advanced farming features
