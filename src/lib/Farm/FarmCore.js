@@ -463,6 +463,12 @@ class AutomationFarm
      * Strategy: Colbur is a Parasite Berry that overtakes Cheri.
      * Harvest Colbur when ripe, then replant Cheri. Colbur will overtake Cheri again.
      * This maximizes Farm Points per second (Colbur gives 2300 FP vs Cheri's 5 FP).
+     *
+     * Planting timing (relative to Petaya planted first):
+     * - Petaya: Planted first (reference time)
+     * - Babiri: 18:00:00 after Petaya (or 11:59:56 with Mulch/Sprayduck, or 07:59:54 with both)
+     * - Payapa: 09:30:00 after Petaya (or 06:19:58 with Mulch/Sprayduck, or 04:13:17 with both)
+     * - Colbur: 07:30:00 after Petaya (or 04:59:58 with Mulch/Sprayduck, or 03:19:58 with both)
      */
     static __maintainColburNonsense()
     {
@@ -476,6 +482,57 @@ class AutomationFarm
         console.log("🔄 Colbur Nonsense: Starting maintenance with layout:", layout);
 
         let actionsPerformed = 0;
+
+        // Check if Petaya has been planted (reference time)
+        const petayaPlot = App.game.farming.plotList[1];
+        const petayaPlanted = !petayaPlot.isEmpty() && petayaPlot.berry === BerryType.Petaya;
+
+        if (!petayaPlanted)
+        {
+            console.log("⏳ Colbur Nonsense: Waiting for Petaya to be planted first");
+            return;
+        }
+
+        // Calculate planting times based on growth multipliers
+        const hasMulch = Automation.Utils.LocalStorage.getValue(this.Settings.UseRichMulch) === "true";
+        const hasSprayduck = App.game.oakItems.itemList[OakItemType.Sprayduck]?.isActive ?? false;
+
+        // Base times in seconds (from Petaya planting)
+        const baseTimes = {
+            babiri: 18 * 60 * 60,  // 18:00:00
+            payapa: 9.5 * 60 * 60, // 09:30:00
+            colbur: 7.5 * 60 * 60  // 07:30:00
+        };
+
+        // Adjusted times based on multipliers
+        let adjustedTimes = { ...baseTimes };
+
+        if (hasMulch && hasSprayduck)
+        {
+            // Both Mulch and Sprayduck
+            adjustedTimes.babiri = 7 * 60 * 60 + 59 * 60 + 54;  // 07:59:54
+            adjustedTimes.payapa = 4 * 60 * 60 + 13 * 60 + 17;  // 04:13:17
+            adjustedTimes.colbur = 3 * 60 * 60 + 19 * 60 + 58;  // 03:19:58
+        }
+        else if (hasMulch || hasSprayduck)
+        {
+            // Mulch or Sprayduck
+            adjustedTimes.babiri = 11 * 60 * 60 + 59 * 60 + 56; // 11:59:56
+            adjustedTimes.payapa = 6 * 60 * 60 + 19 * 60 + 58;  // 06:19:58
+            adjustedTimes.colbur = 4 * 60 * 60 + 59 * 60 + 58;  // 04:59:58
+        }
+
+        console.log(`📊 Colbur Nonsense: Planting times (Mulch: ${hasMulch}, Sprayduck: ${hasSprayduck}):`);
+        console.log(`  Babiri: ${adjustedTimes.babiri}s`);
+        console.log(`  Payapa: ${adjustedTimes.payapa}s`);
+        console.log(`  Colbur: ${adjustedTimes.colbur}s`);
+
+        // Get Petaya planting time (approximate based on age)
+        const petayaAge = petayaPlot.age;
+        const petayaGrowthTime = App.game.farming.berryData[BerryType.Petaya].growthTime[PlotStage.Berry];
+        const timeSincePetayaPlanted = petayaAge;
+
+        console.log(`📊 Colbur Nonsense: Petaya age: ${petayaAge}s, growth time: ${petayaGrowthTime}s`);
 
         // Process each plot
         App.game.farming.plotList.forEach((plot, index) =>
@@ -547,6 +604,96 @@ class AutomationFarm
                     console.log(`⏳ Colbur Nonsense: Cheri growing at plot ${index}, waiting for Colbur to overtake`);
                 }
             }
+            // Handle Babiri plots (index 8, 15, 17)
+            else if ([8, 15, 17].includes(index))
+            {
+                const shouldPlantNow = timeSincePetayaPlanted >= adjustedTimes.babiri;
+
+                if (isEmpty && desiredBerry === BerryType.Babiri)
+                {
+                    if (shouldPlantNow && App.game.farming.hasBerry(BerryType.Babiri))
+                    {
+                        console.log(`🌱 Colbur Nonsense: Planting Babiri at plot ${index} (timing: ${timeSincePetayaPlanted}s >= ${adjustedTimes.babiri}s)`);
+                        App.game.farming.plant(index, BerryType.Babiri);
+                        actionsPerformed++;
+                    }
+                    else if (!shouldPlantNow)
+                    {
+                        console.log(`⏳ Colbur Nonsense: Waiting to plant Babiri at plot ${index} (${timeSincePetayaPlanted}s / ${adjustedTimes.babiri}s)`);
+                    }
+                }
+                else if (!isEmpty && currentBerry === BerryType.Babiri)
+                {
+                    if (stage === PlotStage.Berry)
+                    {
+                        console.log(`🌾 Colbur Nonsense: Harvesting ripe Babiri at plot ${index}`);
+                        App.game.farming.harvest(index);
+                        actionsPerformed++;
+
+                        if (App.game.farming.hasBerry(BerryType.Babiri))
+                        {
+                            console.log(`🌱 Colbur Nonsense: Replanting Babiri at plot ${index}`);
+                            App.game.farming.plant(index, BerryType.Babiri);
+                            actionsPerformed++;
+                        }
+                    }
+                }
+            }
+            // Handle Payapa plots (index 5, 6)
+            else if ([5, 6].includes(index))
+            {
+                const shouldPlantNow = timeSincePetayaPlanted >= adjustedTimes.payapa;
+
+                if (isEmpty && desiredBerry === BerryType.Payapa)
+                {
+                    if (shouldPlantNow && App.game.farming.hasBerry(BerryType.Payapa))
+                    {
+                        console.log(`🌱 Colbur Nonsense: Planting Payapa at plot ${index} (timing: ${timeSincePetayaPlanted}s >= ${adjustedTimes.payapa}s)`);
+                        App.game.farming.plant(index, BerryType.Payapa);
+                        actionsPerformed++;
+                    }
+                    else if (!shouldPlantNow)
+                    {
+                        console.log(`⏳ Colbur Nonsense: Waiting to plant Payapa at plot ${index} (${timeSincePetayaPlanted}s / ${adjustedTimes.payapa}s)`);
+                    }
+                }
+                else if (!isEmpty && currentBerry === BerryType.Payapa)
+                {
+                    if (stage === PlotStage.Berry)
+                    {
+                        console.log(`🌾 Colbur Nonsense: Harvesting ripe Payapa at plot ${index}`);
+                        App.game.farming.harvest(index);
+                        actionsPerformed++;
+
+                        if (App.game.farming.hasBerry(BerryType.Payapa))
+                        {
+                            console.log(`🌱 Colbur Nonsense: Replanting Payapa at plot ${index}`);
+                            App.game.farming.plant(index, BerryType.Payapa);
+                            actionsPerformed++;
+                        }
+                    }
+                }
+            }
+            // Handle Petaya plot (index 1)
+            else if (index === 1)
+            {
+                if (!isEmpty && currentBerry === BerryType.Petaya)
+                {
+                    if (stage === PlotStage.Berry)
+                    {
+                        console.log(`🌾 Colbur Nonsense: Harvesting ripe Petaya at plot ${index}`);
+                        App.game.farming.harvest(index);
+                        actionsPerformed++;
+
+                        if (App.game.farming.hasBerry(BerryType.Petaya))
+                        {
+                            console.log(`🌱 Colbur Nonsense: Replanting Petaya at plot ${index}`);
+                            App.game.farming.plant(index, BerryType.Petaya);
+                            actionsPerformed++;
+                        }
+                    }
+                }
+            }
             // Handle empty plots (can plant Cheri for Colbur to overtake)
             else if (desiredBerry === 0)
             {
@@ -574,28 +721,6 @@ class AutomationFarm
                     actionsPerformed++;
                 }
             }
-            // Handle other berries (Petaya, Payapa, Babiri) - just maintain them
-            else if (!isEmpty && currentBerry === desiredBerry)
-            {
-                // If berry is ripe, harvest and replant
-                if (stage === PlotStage.Berry)
-                {
-                    console.log(`🌾 Colbur Nonsense: Harvesting ripe ${BerryType[currentBerry]} at plot ${index}`);
-                    App.game.farming.harvest(index);
-                    actionsPerformed++;
-
-                    if (App.game.farming.hasBerry(desiredBerry))
-                    {
-                        console.log(`🌱 Colbur Nonsense: Replanting ${BerryType[desiredBerry]} at plot ${index}`);
-                        App.game.farming.plant(index, desiredBerry);
-                        actionsPerformed++;
-                    }
-                }
-                else
-                {
-                    console.log(`⏳ Colbur Nonsense: ${BerryType[currentBerry]} growing at plot ${index} (stage: ${stage})`);
-                }
-            }
             // If wrong berry, remove it and plant correct one
             else if (!isEmpty && currentBerry !== desiredBerry)
             {
@@ -617,20 +742,6 @@ class AutomationFarm
                     console.log(`🌱 Colbur Nonsense: Planting ${BerryType[desiredBerry]} at plot ${index}`);
                     App.game.farming.plant(index, desiredBerry);
                     actionsPerformed++;
-                }
-            }
-            // If plot is empty and should have a berry, plant it
-            else if (isEmpty && desiredBerry !== 0)
-            {
-                if (App.game.farming.hasBerry(desiredBerry))
-                {
-                    console.log(`🌱 Colbur Nonsense: Planting ${BerryType[desiredBerry]} at plot ${index}`);
-                    App.game.farming.plant(index, desiredBerry);
-                    actionsPerformed++;
-                }
-                else
-                {
-                    console.log(`⚠️ Colbur Nonsense: Cannot plant ${BerryType[desiredBerry]} at plot ${index} - not enough berries`);
                 }
             }
         });
