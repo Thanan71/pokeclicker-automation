@@ -309,23 +309,20 @@ class AutomationFarm
      */
     static __farmLoop()
     {
-        // Run enhanced farming features first
-        this.__enhancedFarmLoop();
-
         const colburNonsenseEnabled = Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled);
 
-        // Only run normal harvest logic if Colbur Nonsense is NOT enabled
-        if (!colburNonsenseEnabled)
-        {
-            this.__harvestAsEfficientAsPossible();
-        }
-
+        // If Colbur Nonsense is enabled, ONLY run Colbur Nonsense logic
         if (colburNonsenseEnabled)
         {
             this.__maintainColburNonsense();
-            // Skip normal farming logic when Colbur Nonsense is enabled
             return;
         }
+
+        // Run enhanced farming features first (only if Colbur Nonsense is NOT enabled)
+        this.__enhancedFarmLoop();
+
+        // Run normal harvest logic
+        this.__harvestAsEfficientAsPossible();
 
         // Try to unlock berries, if enabled
         if ((Automation.Utils.LocalStorage.getValue(this.Settings.FocusOnUnlocks) === "true")
@@ -431,6 +428,13 @@ class AutomationFarm
      */
     static __optimalTimingHarvest()
     {
+        // Skip optimal timing harvest if Colbur Nonsense is enabled
+        const colburNonsenseEnabled = Automation.Utils.LocalStorage.getValue(AutomationFarm.Settings.ColburNonsenseEnabled);
+        if (colburNonsenseEnabled)
+        {
+            return;
+        }
+
         FarmPlotManager.scanPlotStates();
 
         const richMulchEnabled = Automation.Utils.LocalStorage.getValue(this.Settings.UseRichMulch) === "true";
@@ -555,26 +559,55 @@ class AutomationFarm
         App.game.farming.plotList.forEach((plot, index) =>
         {
             const desiredBerry = layout[index] ?? 0;
+            const currentBerry = plot.berry;
+            const isEmpty = plot.isEmpty();
 
-            // If plot is empty and we want a berry there, plant it
-            if (plot.isEmpty())
+            // If plot has a berry but we want it empty
+            if (!isEmpty && desiredBerry === 0)
             {
-                if (desiredBerry !== 0)
+                // If berry is fully grown, harvest it
+                if (plot.stage() === PlotStage.Berry)
+                {
+                    App.game.farming.harvest(index);
+                }
+                // If berry is not fully grown, use shovel to remove it
+                else
+                {
+                    App.game.farming.shovel(index);
+                }
+            }
+            // If plot is empty and we want a berry there, plant it
+            else if (isEmpty && desiredBerry !== 0)
+            {
+                if (App.game.farming.hasBerry(desiredBerry))
                 {
                     App.game.farming.plant(index, desiredBerry);
                 }
             }
             // If plot has a different berry than desired, replace it
-            else if (plot.berry !== desiredBerry)
+            else if (!isEmpty && currentBerry !== desiredBerry)
             {
-                App.game.farming.harvest(index);
-                App.game.farming.plant(index, desiredBerry);
+                // If berry is fully grown, harvest it
+                if (plot.stage() === PlotStage.Berry)
+                {
+                    App.game.farming.harvest(index);
+                }
+                // If berry is not fully grown, use shovel to remove it
+                else
+                {
+                    App.game.farming.shovel(index);
+                }
+                // Plant the desired berry if we want one there
+                if (desiredBerry !== 0 && App.game.farming.hasBerry(desiredBerry))
+                {
+                    App.game.farming.plant(index, desiredBerry);
+                }
             }
-            // Special case: harvest Colbur (51) when fully grown and replant empty
-            else if (plot.stage() === PlotStage.Berry && plot.berry === 51)
+            // Special case: harvest Colbur (51) when fully grown and keep empty
+            else if (!isEmpty && plot.stage() === PlotStage.Berry && currentBerry === 51)
             {
                 App.game.farming.harvest(index);
-                App.game.farming.plant(index, 0);
+                // Don't plant anything - keep the plot empty
             }
         });
     }
